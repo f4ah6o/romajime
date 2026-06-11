@@ -9,7 +9,7 @@
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.f12o.Romajime.inputmethod</string>
+	<string>com.f12o.inputmethod.Romajime</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -29,7 +29,7 @@
 			<key>com.apple.inputmethod.Japanese</key>
 			<dict>
 				<key>TISInputSourceID</key>
-				<string>com.f12o.Romajime.inputmethod.Japanese</string>
+				<string>com.f12o.inputmethod.Romajime.Japanese</string>
 				<key>TISIntendedLanguage</key>
 				<string>ja</string>
 				<key>tsInputModeDefaultStateKey</key>
@@ -69,7 +69,5 @@
 		<string>Hira</string>
 		<string>Kana</string>
 	</array>
-	<key>tsInputMethodIconFileKey</key>
-	<string></string>
 </dict>
 </plist>

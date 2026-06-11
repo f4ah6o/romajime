@@ -17,30 +17,24 @@ The shared conversion core lives in `RomajimeCore` so later AI conversion and iO
 
 ## Build and Install (Recommended: Using Justfile)
 
+### Prerequisites
+
+- `xcodegen` (`brew install xcodegen`) and `just` (`brew install just`)
+- An **Apple Development** signing certificate. Free Apple ID is enough:
+  Xcode → Settings → Accounts → add Apple ID → Manage Certificates → '+' → Apple Development.
+
 ### Quick Setup
 
 ```bash
-cd /Users/fu2hito/src/romajime
-
-# Build
-just build
-
-# Install to ~/Library/Input Methods
+# Build, sign, install to ~/Library/Input Methods, and register (no reboot needed)
 just install
 
-# Configure in System Settings (interactive guide)
-just setup
+# Then add Romajime manually:
+#   System Settings → Keyboard → Input Sources → Edit → '+' → Japanese → Romajime → Add
 
-# Verify installation
+# Verify registration / show test steps
+just check
 just test
-```
-
-### Manual Setup (Legacy)
-
-```bash
-xcodegen generate
-xcodebuild test -scheme Romajime -project Romajime.xcodeproj -destination 'platform=macOS'
-./script/build_and_run.sh --verify
 ```
 
 ### Available Justfile Recipes
@@ -48,8 +42,11 @@ xcodebuild test -scheme Romajime -project Romajime.xcodeproj -destination 'platf
 Run `just help` for all available recipes:
 
 - **`just build`** - Compile the project with xcodebuild
-- **`just install`** - Copy RomajimeInputMethod.app to ~/Library/Input Methods
-- **`just setup`** - Show interactive System Settings configuration steps
+- **`just sign`** - Sign with your Apple Development certificate
+- **`just install`** - Build, sign, copy to ~/Library/Input Methods, and register
+- **`just register`** - (Re-)register the installed app with Text Input Services
+- **`just check`** - Verify the input source is visible to the system
+- **`just setup`** - Install + show System Settings configuration steps
 - **`just test`** - Display manual testing instructions
 - **`just dev-run`** - Launch the app directly (for development)
 - **`just clean`** - Remove build artifacts
@@ -65,7 +62,33 @@ The debug input method app is produced at:
 DerivedData/Build/Products/Debug/RomajimeInputMethod.app
 ```
 
-For manual smoke testing, copy it to `~/Library/Input Methods/`, log out and back in or restart text input services, then enable Romajime in Keyboard settings.
+## macOS Registration Notes (Hard-Won Knowledge)
+
+Getting a development-signed IME to appear in System Settings on macOS 26
+required all of the following — `just install` handles every step:
+
+1. **Bundle ID must contain `.inputmethod.` as an inner component.**
+   `com.f12o.inputmethod.Romajime` works; `com.f12o.Romajime.inputmethod`
+   (trailing component) is silently ignored by the input source scan.
+   All real IMEs follow this shape: `com.justsystems.inputmethod.atok35`,
+   `dev.ensan.inputmethod.azooKeyMac`, `com.apple.inputmethod.Kotoeri`.
+2. **`ENABLE_DEBUG_DYLIB: NO`.** Xcode debug builds otherwise produce a stub
+   executable plus `*.debug.dylib`, which breaks the IME bundle.
+3. **A valid code signature.** Ad-hoc builds with `CODE_SIGNING_ALLOWED: NO`
+   leave a broken signature. Sign frameworks first, then the app
+   (`codesign --force --options runtime --sign "Apple Development: ..."`).
+4. **Copy with `ditto`, not `cp -r`** — `cp` flattens the framework symlink
+   structure and invalidates the signature.
+5. **Rebuild the per-user input source cache atomically.** The cache lives at
+   `$(getconf DARWIN_USER_CACHE_DIR)/com.apple.IntlDataCache.le*`. Stale caches
+   hide new IMEs. The deletion and the rescan must happen inside one process
+   (`script/imesetup.swift refresh`): if a sandboxed process rebuilds the cache
+   first, it cannot read `~/Library/Input Methods` and writes a cache without
+   user IMEs.
+6. **Never call `TISRegisterInputSource` / `TISEnableInputSource`** from a
+   helper on macOS 26 — both write back a store that drops user-installed
+   bundles for other processes. Let the directory scan discover the bundle and
+   let the user enable it in System Settings.
 
 ## Memory
 
