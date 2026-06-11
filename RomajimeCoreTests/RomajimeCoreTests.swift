@@ -51,16 +51,24 @@ final class RomajimeCoreTests: XCTestCase {
         XCTAssertEqual(policy.delay(afterKeystrokeInterval: 0.08), 1.8)
     }
 
-    func testJumpLabelsUseNumbers() {
-        XCTAssertEqual(JumpLabelGenerator.label(for: 0), "1")
-        XCTAssertEqual(JumpLabelGenerator.label(for: 8), "9")
-        XCTAssertEqual(JumpLabelGenerator.label(for: 9), "10")
-        XCTAssertEqual(JumpLabelGenerator.label(for: 26), "27")
+    func testJumpLabelsContinueFromZToAA() {
+        XCTAssertEqual(JumpLabelGenerator.label(for: 0), "a")
+        XCTAssertEqual(JumpLabelGenerator.label(for: 25), "z")
+        XCTAssertEqual(JumpLabelGenerator.label(for: 26), "aa")
+        XCTAssertEqual(JumpLabelGenerator.label(for: 27), "ab")
     }
 
-    func testTextUnitScannerUsesLineBoundaries() {
-        let targets = TextUnitScanner.jumpTargets(in: "koreha yameru\n\nもっと 長文", baseLocation: 10)
-        XCTAssertEqual(targets.map(\.label), ["1", "2"])
+    func testTextUnitScannerUsesPhraseBoundariesNotWhitespace() {
+        let targets = TextUnitScanner.jumpTargets(in: "koreha yameru. motto chobun\n  もっと 長文。", baseLocation: 10)
+        XCTAssertEqual(targets.map(\.label), ["a", "b", "c"])
+        XCTAssertEqual(targets.map(\.text), ["koreha yameru.", "motto chobun", "もっと 長文。"])
+        XCTAssertEqual(targets.first?.range, NSRange(location: 10, length: 14))
+        XCTAssertEqual(targets.last?.range.location, 40)
+    }
+
+    func testLineJumpScannerUsesLineBoundaries() {
+        let targets = LineJumpScanner.jumpTargets(in: "koreha yameru\n\nもっと 長文", baseLocation: 10)
+        XCTAssertEqual(targets.map(\.label), ["a", "b"])
         XCTAssertEqual(targets.map(\.text), ["koreha yameru", "もっと 長文"])
         XCTAssertEqual(targets.first?.range, NSRange(location: 10, length: 13))
         XCTAssertEqual(targets.last?.range.location, 25)

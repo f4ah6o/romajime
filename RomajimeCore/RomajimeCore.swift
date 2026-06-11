@@ -100,22 +100,77 @@ public struct JumpTarget: Equatable, Sendable {
 }
 
 public enum JumpLabelGenerator {
+    private static let alphabet = Array("abcdefghijklmnopqrstuvwxyz")
+
     public static func label(for index: Int) -> String {
         precondition(index >= 0)
-        return String(index + 1)
+        if index < alphabet.count {
+            return String(alphabet[index])
+        }
+
+        let adjusted = index - alphabet.count
+        let first = alphabet[adjusted / alphabet.count]
+        let second = alphabet[adjusted % alphabet.count]
+        return String([first, second])
     }
 }
 
 public enum TextUnitScanner {
+    private static let hardSeparators = CharacterSet.newlines
+        .union(CharacterSet(charactersIn: "。、，．！？!?;；:：.,"))
+
+    public static func jumpTargets(in text: String, baseLocation: Int = 0) -> [JumpTarget] {
+        var targets: [JumpTarget] = []
+        var current = ""
+        var currentStart: Int?
+        var utf16Offset = 0
+
+        func finishRun(at endOffset: Int) {
+            let trimmed = current.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let start = currentStart, !trimmed.isEmpty else {
+                current.removeAll()
+                currentStart = nil
+                return
+            }
+            let leadingWhitespace = current.prefix { $0.isWhitespace }.map { String($0).utf16.count }.reduce(0, +)
+            let label = JumpLabelGenerator.label(for: targets.count)
+            targets.append(.init(label: label, text: trimmed, range: NSRange(location: baseLocation + start + leadingWhitespace, length: trimmed.utf16.count)))
+            current.removeAll()
+            currentStart = nil
+        }
+
+        for character in text {
+            let length = String(character).utf16.count
+            if currentStart == nil {
+                currentStart = utf16Offset
+            }
+            current.append(character)
+            if isHardSeparator(character) {
+                finishRun(at: utf16Offset + length)
+            }
+            utf16Offset += length
+        }
+        finishRun(at: utf16Offset)
+        return targets
+    }
+
+    private static func isHardSeparator(_ character: Character) -> Bool {
+        character.unicodeScalars.allSatisfy { hardSeparators.contains($0) }
+    }
+}
+
+public enum LineJumpScanner {
     public static func jumpTargets(in text: String, baseLocation: Int = 0) -> [JumpTarget] {
         var targets: [JumpTarget] = []
         var utf16Offset = 0
 
         for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
             let lineText = String(line)
-            if !lineText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let trimmed = lineText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                let leadingWhitespace = lineText.prefix { $0.isWhitespace }.map { String($0).utf16.count }.reduce(0, +)
                 let label = JumpLabelGenerator.label(for: targets.count)
-                targets.append(.init(label: label, text: lineText, range: NSRange(location: baseLocation + utf16Offset, length: lineText.utf16.count)))
+                targets.append(.init(label: label, text: trimmed, range: NSRange(location: baseLocation + utf16Offset + leadingWhitespace, length: trimmed.utf16.count)))
             }
             utf16Offset += lineText.utf16.count + 1
         }

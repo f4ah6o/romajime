@@ -155,7 +155,7 @@ public final class RomajimeInputController: IMKInputController {
             return true
         }
 
-        guard let characters = event.charactersIgnoringModifiers, characters.count == 1, let character = characters.first, character.isASCII, character.isNumber else {
+        guard let characters = event.charactersIgnoringModifiers?.lowercased(), characters.count == 1, let character = characters.first, character.isASCII, character.isLetter else {
             exitJumpMode()
             return false
         }
