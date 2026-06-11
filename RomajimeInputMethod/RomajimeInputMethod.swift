@@ -20,7 +20,8 @@ public final class RomajimeInputController: IMKInputController {
     private var lastInputAt: Date?
     private var jumpTargets: [JumpTarget] = []
     private var jumpLabelBuffer = ""
-    private var jumpTimer: Timer?
+    private var jumpModeTimer: Timer?
+    private let jumpModeTimeout: TimeInterval = 3.0
 
     public override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard event.type == .keyDown else {
@@ -144,24 +145,24 @@ public final class RomajimeInputController: IMKInputController {
             return true
         }
 
-        guard let characters = event.charactersIgnoringModifiers?.lowercased(), characters.count == 1, let character = characters.first, character.isASCII, character.isLetter else {
+        if event.keyCode == 49 {
+            if let target = jumpTargets.first(where: { $0.label == jumpLabelBuffer }) {
+                jump(to: target, client: sender)
+            } else {
+                NSSound.beep()
+            }
+            exitJumpMode()
+            return true
+        }
+
+        guard let characters = event.charactersIgnoringModifiers, characters.count == 1, let character = characters.first, character.isASCII, character.isNumber else {
             exitJumpMode()
             return false
         }
 
-        cancelPendingJump()
         jumpLabelBuffer.append(character)
-        if let target = jumpTargets.first(where: { $0.label == jumpLabelBuffer }) {
-            if jumpTargets.contains(where: { $0.label != jumpLabelBuffer && $0.label.hasPrefix(jumpLabelBuffer) }) {
-                schedulePendingJump(to: target, client: sender)
-            } else {
-                jump(to: target, client: sender)
-                exitJumpMode()
-            }
-            return true
-        }
-
         if jumpTargets.contains(where: { $0.label.hasPrefix(jumpLabelBuffer) }) {
+            scheduleJumpModeTimeout()
             return true
         }
 
@@ -179,32 +180,29 @@ public final class RomajimeInputController: IMKInputController {
         jumpLabelBuffer.removeAll()
         if jumpTargets.isEmpty {
             NSSound.beep()
+        } else {
+            scheduleJumpModeTimeout()
         }
     }
 
     private func exitJumpMode() {
-        cancelPendingJump()
+        cancelJumpModeTimeout()
         jumpTargets.removeAll()
         jumpLabelBuffer.removeAll()
     }
 
-    private func schedulePendingJump(to target: JumpTarget, client sender: Any!) {
-        let client = sender as AnyObject
-        jumpTimer = Timer.scheduledTimer(timeInterval: 0.35, target: self, selector: #selector(pendingJumpTimerFired(_:)), userInfo: PendingJump(target: target, client: client), repeats: false)
-    }
-
-    @objc private func pendingJumpTimerFired(_ timer: Timer) {
-        guard let pending = timer.userInfo as? PendingJump else {
-            exitJumpMode()
-            return
-        }
-        jump(to: pending.target, client: pending.client)
+    @objc private func jumpModeTimerFired(_ timer: Timer) {
         exitJumpMode()
     }
 
-    private func cancelPendingJump() {
-        jumpTimer?.invalidate()
-        jumpTimer = nil
+    private func scheduleJumpModeTimeout() {
+        cancelJumpModeTimeout()
+        jumpModeTimer = Timer.scheduledTimer(timeInterval: jumpModeTimeout, target: self, selector: #selector(jumpModeTimerFired(_:)), userInfo: nil, repeats: false)
+    }
+
+    private func cancelJumpModeTimeout() {
+        jumpModeTimer?.invalidate()
+        jumpModeTimer = nil
     }
 
     private func jump(to target: JumpTarget, client sender: Any!) {
@@ -260,15 +258,5 @@ private final class MemoryStore {
         let url = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Romajime/memory.md")
         return (try? String(contentsOf: url, encoding: .utf8)) ?? "mtg -> ミーティング\ntodo -> TODO\n"
-    }
-}
-
-private final class PendingJump {
-    let target: JumpTarget
-    let client: AnyObject
-
-    init(target: JumpTarget, client: AnyObject) {
-        self.target = target
-        self.client = client
     }
 }

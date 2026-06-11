@@ -14,7 +14,7 @@ Phase 1 is implemented:
   accidental raw commit path.
 - Convert and commit immediately with Escape while composing.
 - Start text-unit jump mode with Escape while not composing. Jump labels use
-  `a` through `z`, then `aa`, `ab`, and so on.
+  numbers in reading order; type the number, then press Space to jump.
 - Use a rule-based romaji-to-kana core with simple `memory.md` term replacement.
 
 The default idle conversion delay is 1.2 seconds. Very fast typing extends that
@@ -24,10 +24,10 @@ often used as Send shortcuts in chat apps.
 
 Jump mode reads nearby text from the active `IMKTextInput`, splits it on
 whitespace and Japanese punctuation, assigns labels to each unit, then moves the
-insertion point when the matching label is typed. Single-letter labels wait
-briefly before jumping so two-letter labels such as `aa` can still be typed.
-Inline visual link overlays are not implemented yet; that likely needs a
-companion accessibility overlay rather than pure InputMethodKit marked text.
+insertion point when Space confirms the typed number. Jump mode cancels after
+3 seconds of inactivity. Inline visual link overlays are not implemented yet;
+that likely needs a companion accessibility overlay rather than pure
+InputMethodKit marked text.
 
 The shared conversion core lives in `RomajimeCore` so later AI conversion and iOS keyboard work can reuse the same state and backend contracts.
 

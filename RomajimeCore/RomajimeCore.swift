@@ -100,18 +100,9 @@ public struct JumpTarget: Equatable, Sendable {
 }
 
 public enum JumpLabelGenerator {
-    private static let alphabet = Array("abcdefghijklmnopqrstuvwxyz")
-
     public static func label(for index: Int) -> String {
         precondition(index >= 0)
-        if index < alphabet.count {
-            return String(alphabet[index])
-        }
-
-        let adjusted = index - alphabet.count
-        let first = alphabet[adjusted / alphabet.count]
-        let second = alphabet[adjusted % alphabet.count]
-        return String([first, second])
+        return String(index + 1)
     }
 }
 

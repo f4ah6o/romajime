@@ -120,6 +120,7 @@ LSREGISTER := "/System/Library/Frameworks/CoreServices.framework/Frameworks/Laun
     @echo "     (Enter while typing) → ignored"
     @echo "     (Escape while typing) → convert immediately"
     @echo "     (Escape while idle)  → enter jump mode"
+    @echo "     1 2 ... + Space      → jump to numbered unit"
     @echo ""
 
 # Run the app in development mode (not as input method)
