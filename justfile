@@ -121,6 +121,7 @@ LSREGISTER := "/System/Library/Frameworks/CoreServices.framework/Frameworks/Laun
     @echo "     (Escape while typing) → convert immediately"
     @echo "     (Escape while idle)  → enter jump mode"
     @echo "     a b ... + Space      → jump to labeled phrase"
+    @echo "     1 2 ... + Space      → jump to same phrase by number"
     @echo ""
 
 # Run the app in development mode (not as input method)

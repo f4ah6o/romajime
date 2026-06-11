@@ -146,7 +146,7 @@ public final class RomajimeInputController: IMKInputController {
         }
 
         if event.keyCode == 49 {
-            if let target = jumpTargets.first(where: { $0.label == jumpLabelBuffer }) {
+            if let target = jumpTarget(matching: jumpLabelBuffer) {
                 jump(to: target, client: sender)
             } else {
                 NSSound.beep()
@@ -155,19 +155,32 @@ public final class RomajimeInputController: IMKInputController {
             return true
         }
 
-        guard let characters = event.charactersIgnoringModifiers?.lowercased(), characters.count == 1, let character = characters.first, character.isASCII, character.isLetter else {
+        guard let characters = event.charactersIgnoringModifiers?.lowercased(), characters.count == 1, let character = characters.first, character.isASCII, character.isLetter || character.isNumber else {
             exitJumpMode()
             return false
         }
 
         jumpLabelBuffer.append(character)
-        if jumpTargets.contains(where: { $0.label.hasPrefix(jumpLabelBuffer) }) {
+        if hasJumpTarget(withPrefix: jumpLabelBuffer) {
             scheduleJumpModeTimeout()
             return true
         }
 
         exitJumpMode()
         return true
+    }
+
+    private func jumpTarget(matching label: String) -> JumpTarget? {
+        for (index, target) in jumpTargets.enumerated() where JumpLabelGenerator.labels(for: index).contains(label) {
+            return target
+        }
+        return nil
+    }
+
+    private func hasJumpTarget(withPrefix prefix: String) -> Bool {
+        jumpTargets.indices.contains { index in
+            JumpLabelGenerator.labels(for: index).contains { $0.hasPrefix(prefix) }
+        }
     }
 
     private func enterJumpMode(client sender: Any!) {

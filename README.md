@@ -13,8 +13,9 @@ Phase 1 is implemented:
 - Ignore Enter while composing, so chat-style Send shortcuts do not become an
   accidental raw commit path.
 - Convert and commit immediately with Escape while composing.
-- Start phrase jump mode with Escape while not composing. Jump labels use
-  alphabetic labels in reading order; type the label, then press Space to jump.
+- Start phrase jump mode with Escape while not composing. Jump labels accept
+  alphabetic labels or numeric aliases in reading order; type the label, then
+  press Space to jump.
 - Use a rule-based romaji-to-kana core with simple `memory.md` term replacement.
 
 The default idle conversion delay is 1.2 seconds. Very fast typing extends that
@@ -25,10 +26,11 @@ often used as Send shortcuts in chat apps.
 Jump mode reads nearby text from the active `IMKTextInput`, groups it into
 larger phrases using punctuation and newlines rather than every whitespace
 separated word, then moves the insertion point to the chosen phrase when Space
-confirms the typed label. Labels run `a` through `z`, then `aa`, `ab`, and so on.
-Jump mode cancels after 3 seconds of inactivity. Inline visual link overlays are
-not implemented yet; that likely needs a companion accessibility overlay rather
-than pure InputMethodKit marked text.
+confirms the typed label. Alphabet labels run `a` through `z`, then `aa`, `ab`,
+and so on; numeric aliases run `1`, `2`, `3`, and so on. Jump mode cancels after
+3 seconds of inactivity. Inline visual link overlays are not implemented yet;
+that likely needs a companion accessibility overlay rather than pure
+InputMethodKit marked text.
 
 The shared conversion core lives in `RomajimeCore` so later AI conversion and iOS keyboard work can reuse the same state and backend contracts.
 

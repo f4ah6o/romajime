@@ -113,6 +113,15 @@ public enum JumpLabelGenerator {
         let second = alphabet[adjusted % alphabet.count]
         return String([first, second])
     }
+
+    public static func numericLabel(for index: Int) -> String {
+        precondition(index >= 0)
+        return String(index + 1)
+    }
+
+    public static func labels(for index: Int) -> [String] {
+        [label(for: index), numericLabel(for: index)]
+    }
 }
 
 public enum TextUnitScanner {

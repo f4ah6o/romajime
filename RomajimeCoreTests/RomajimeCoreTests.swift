@@ -58,6 +58,12 @@ final class RomajimeCoreTests: XCTestCase {
         XCTAssertEqual(JumpLabelGenerator.label(for: 27), "ab")
     }
 
+    func testJumpLabelsAlsoExposeNumericAliases() {
+        XCTAssertEqual(JumpLabelGenerator.numericLabel(for: 0), "1")
+        XCTAssertEqual(JumpLabelGenerator.numericLabel(for: 9), "10")
+        XCTAssertEqual(JumpLabelGenerator.labels(for: 26), ["aa", "27"])
+    }
+
     func testTextUnitScannerUsesPhraseBoundariesNotWhitespace() {
         let targets = TextUnitScanner.jumpTargets(in: "koreha yameru. motto chobun\n  もっと 長文。", baseLocation: 10)
         XCTAssertEqual(targets.map(\.label), ["a", "b", "c"])
