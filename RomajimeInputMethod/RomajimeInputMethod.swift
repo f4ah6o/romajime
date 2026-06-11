@@ -18,10 +18,17 @@ public final class RomajimeInputController: IMKInputController {
     private let idleConversionPolicy = IdleConversionPolicy()
     private var idleTimer: Timer?
     private var lastInputAt: Date?
+    private var jumpTargets: [JumpTarget] = []
+    private var jumpLabelBuffer = ""
+    private var jumpTimer: Timer?
 
     public override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard event.type == .keyDown else {
             return false
+        }
+
+        if handleJumpMode(event, client: sender) {
+            return true
         }
 
         if handleCommand(event, client: sender) {
@@ -79,10 +86,11 @@ public final class RomajimeInputController: IMKInputController {
             }
             return true
         case 53:
-            guard state.isComposing else {
-                return false
+            if state.isComposing {
+                convertAndCommit(client: sender)
+            } else {
+                enterJumpMode(client: sender)
             }
-            convertAndCommit(client: sender)
             return true
         default:
             return false
@@ -122,6 +130,108 @@ public final class RomajimeInputController: IMKInputController {
         idleTimer = nil
     }
 
+    private var isJumpModeActive: Bool {
+        !jumpTargets.isEmpty
+    }
+
+    private func handleJumpMode(_ event: NSEvent, client sender: Any!) -> Bool {
+        guard isJumpModeActive else {
+            return false
+        }
+
+        if event.keyCode == 53 {
+            exitJumpMode()
+            return true
+        }
+
+        guard let characters = event.charactersIgnoringModifiers?.lowercased(), characters.count == 1, let character = characters.first, character.isASCII, character.isLetter else {
+            exitJumpMode()
+            return false
+        }
+
+        cancelPendingJump()
+        jumpLabelBuffer.append(character)
+        if let target = jumpTargets.first(where: { $0.label == jumpLabelBuffer }) {
+            if jumpTargets.contains(where: { $0.label != jumpLabelBuffer && $0.label.hasPrefix(jumpLabelBuffer) }) {
+                schedulePendingJump(to: target, client: sender)
+            } else {
+                jump(to: target, client: sender)
+                exitJumpMode()
+            }
+            return true
+        }
+
+        if jumpTargets.contains(where: { $0.label.hasPrefix(jumpLabelBuffer) }) {
+            return true
+        }
+
+        exitJumpMode()
+        return true
+    }
+
+    private func enterJumpMode(client sender: Any!) {
+        guard let client = inputClient(sender) else {
+            return
+        }
+        let selection = client.selectedRange()
+        let context = surroundingText(around: selection.location, client: client)
+        jumpTargets = TextUnitScanner.jumpTargets(in: context.text, baseLocation: context.range.location)
+        jumpLabelBuffer.removeAll()
+        if jumpTargets.isEmpty {
+            NSSound.beep()
+        }
+    }
+
+    private func exitJumpMode() {
+        cancelPendingJump()
+        jumpTargets.removeAll()
+        jumpLabelBuffer.removeAll()
+    }
+
+    private func schedulePendingJump(to target: JumpTarget, client sender: Any!) {
+        let client = sender as AnyObject
+        jumpTimer = Timer.scheduledTimer(timeInterval: 0.35, target: self, selector: #selector(pendingJumpTimerFired(_:)), userInfo: PendingJump(target: target, client: client), repeats: false)
+    }
+
+    @objc private func pendingJumpTimerFired(_ timer: Timer) {
+        guard let pending = timer.userInfo as? PendingJump else {
+            exitJumpMode()
+            return
+        }
+        jump(to: pending.target, client: pending.client)
+        exitJumpMode()
+    }
+
+    private func cancelPendingJump() {
+        jumpTimer?.invalidate()
+        jumpTimer = nil
+    }
+
+    private func jump(to target: JumpTarget, client sender: Any!) {
+        guard let client = inputClient(sender) else {
+            return
+        }
+        client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: target.range.location, length: 0))
+    }
+
+    private func surroundingText(around location: Int, client: any IMKTextInput) -> (text: String, range: NSRange) {
+        let beforeLength = min(location, 1000)
+        let beforeRange = NSRange(location: location - beforeLength, length: beforeLength)
+        let beforeText = client.attributedSubstring(from: beforeRange)?.string ?? ""
+        let afterText = attributedSubstringAfter(location: location, client: client)
+        let text = beforeText + afterText
+        return (text, NSRange(location: beforeRange.location, length: text.utf16.count))
+    }
+
+    private func attributedSubstringAfter(location: Int, client: any IMKTextInput) -> String {
+        for length in stride(from: 1000, through: 1, by: -100) {
+            if let text = client.attributedSubstring(from: NSRange(location: location, length: length))?.string {
+                return text
+            }
+        }
+        return ""
+    }
+
     private func updateMarkedText(client sender: Any!) {
         let text = state.buffer
         inputClient(sender)?.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
@@ -150,5 +260,15 @@ private final class MemoryStore {
         let url = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Romajime/memory.md")
         return (try? String(contentsOf: url, encoding: .utf8)) ?? "mtg -> ミーティング\ntodo -> TODO\n"
+    }
+}
+
+private final class PendingJump {
+    let target: JumpTarget
+    let client: AnyObject
+
+    init(target: JumpTarget, client: AnyObject) {
+        self.target = target
+        self.client = client
     }
 }

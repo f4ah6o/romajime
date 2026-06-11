@@ -87,6 +87,78 @@ public struct IdleConversionPolicy: Equatable, Sendable {
     }
 }
 
+public struct JumpTarget: Equatable, Sendable {
+    public var label: String
+    public var text: String
+    public var range: NSRange
+
+    public init(label: String, text: String, range: NSRange) {
+        self.label = label
+        self.text = text
+        self.range = range
+    }
+}
+
+public enum JumpLabelGenerator {
+    private static let alphabet = Array("abcdefghijklmnopqrstuvwxyz")
+
+    public static func label(for index: Int) -> String {
+        precondition(index >= 0)
+        if index < alphabet.count {
+            return String(alphabet[index])
+        }
+
+        let adjusted = index - alphabet.count
+        let first = alphabet[adjusted / alphabet.count]
+        let second = alphabet[adjusted % alphabet.count]
+        return String([first, second])
+    }
+}
+
+public enum TextUnitScanner {
+    private static let separators = CharacterSet.whitespacesAndNewlines
+        .union(.punctuationCharacters)
+        .union(CharacterSet(charactersIn: "。、，．！？「」『』（）［］【】"))
+
+    public static func jumpTargets(in text: String, baseLocation: Int = 0) -> [JumpTarget] {
+        var targets: [JumpTarget] = []
+        var current = ""
+        var currentStart: Int?
+        var utf16Offset = 0
+
+        func finishRun(at endOffset: Int) {
+            guard let start = currentStart, !current.isEmpty else {
+                current.removeAll()
+                currentStart = nil
+                return
+            }
+            let label = JumpLabelGenerator.label(for: targets.count)
+            targets.append(.init(label: label, text: current, range: NSRange(location: baseLocation + start, length: endOffset - start)))
+            current.removeAll()
+            currentStart = nil
+        }
+
+        for character in text {
+            let length = String(character).utf16.count
+            if isSeparator(character) {
+                finishRun(at: utf16Offset)
+            } else {
+                if currentStart == nil {
+                    currentStart = utf16Offset
+                }
+                current.append(character)
+            }
+            utf16Offset += length
+        }
+        finishRun(at: utf16Offset)
+        return targets
+    }
+
+    private static func isSeparator(_ character: Character) -> Bool {
+        character.unicodeScalars.allSatisfy { separators.contains($0) }
+    }
+}
+
 public final class RuleBasedConversionBackend: ConversionBackend, @unchecked Sendable {
     private let dictionary: RomajiDictionary
 
