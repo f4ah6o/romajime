@@ -82,9 +82,7 @@ public final class RomajimeInputController: IMKInputController {
             guard state.isComposing else {
                 return false
             }
-            state.clear()
-            cancelIdleConversion()
-            clearMarkedText(client: sender)
+            convertAndCommit(client: sender)
             return true
         default:
             return false

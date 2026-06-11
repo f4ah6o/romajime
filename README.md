@@ -12,7 +12,7 @@ Phase 1 is implemented:
 - Convert and commit the whole buffered draft automatically after typing pauses.
 - Ignore Enter while composing, so chat-style Send shortcuts do not become an
   accidental raw commit path.
-- Cancel with Escape.
+- Convert and commit immediately with Escape.
 - Use a rule-based romaji-to-kana core with simple `memory.md` term replacement.
 
 The default idle conversion delay is 1.2 seconds. Very fast typing extends that
