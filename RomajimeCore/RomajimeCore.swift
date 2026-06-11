@@ -68,6 +68,25 @@ public protocol ConversionBackend: Sendable {
     func convert(_ request: ConversionRequest) throws -> ConversionResult
 }
 
+public struct IdleConversionPolicy: Equatable, Sendable {
+    public var baseDelay: TimeInterval
+    public var fastTypingDelay: TimeInterval
+    public var fastTypingThreshold: TimeInterval
+
+    public init(baseDelay: TimeInterval = 1.2, fastTypingDelay: TimeInterval = 1.8, fastTypingThreshold: TimeInterval = 0.18) {
+        self.baseDelay = baseDelay
+        self.fastTypingDelay = fastTypingDelay
+        self.fastTypingThreshold = fastTypingThreshold
+    }
+
+    public func delay(afterKeystrokeInterval interval: TimeInterval?) -> TimeInterval {
+        guard let interval else {
+            return baseDelay
+        }
+        return interval < fastTypingThreshold ? fastTypingDelay : baseDelay
+    }
+}
+
 public final class RuleBasedConversionBackend: ConversionBackend, @unchecked Sendable {
     private let dictionary: RomajiDictionary
 

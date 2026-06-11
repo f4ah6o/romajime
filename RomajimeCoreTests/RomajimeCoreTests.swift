@@ -43,4 +43,11 @@ final class RomajimeCoreTests: XCTestCase {
     func testWhitespaceNormalization() {
         XCTAssertEqual(CompositionNormalizer.normalizeWhitespace("  kyou   mtg\tde\nhanasita todo  "), "kyou mtg de hanasita todo")
     }
+
+    func testIdleConversionPolicyExtendsDelayWhileTypingFast() {
+        let policy = IdleConversionPolicy(baseDelay: 1.2, fastTypingDelay: 1.8, fastTypingThreshold: 0.18)
+        XCTAssertEqual(policy.delay(afterKeystrokeInterval: nil), 1.2)
+        XCTAssertEqual(policy.delay(afterKeystrokeInterval: 0.4), 1.2)
+        XCTAssertEqual(policy.delay(afterKeystrokeInterval: 0.08), 1.8)
+    }
 }

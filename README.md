@@ -9,10 +9,15 @@ Phase 1 is implemented:
 - Buffer romaji input in an InputMethodKit controller.
 - Keep spaces in the composition buffer for long-form romaji drafts.
 - Do not do IME-style conversion or candidate cycling while typing.
+- Convert and commit the whole buffered draft automatically after typing pauses.
 - Commit raw draft text with Enter.
-- Convert the whole buffered draft with Control+Enter.
 - Cancel with Escape.
 - Use a rule-based romaji-to-kana core with simple `memory.md` term replacement.
+
+The default idle conversion delay is 1.2 seconds. Very fast typing extends that
+wait to 1.8 seconds so long-form drafting is less likely to be interrupted.
+Romajime does not require Control+Enter or Command+Enter because those keys are
+often used as Send shortcuts in chat apps.
 
 The shared conversion core lives in `RomajimeCore` so later AI conversion and iOS keyboard work can reuse the same state and backend contracts.
 

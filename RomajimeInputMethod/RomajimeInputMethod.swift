@@ -15,6 +15,9 @@ public final class RomajimeInputController: IMKInputController {
     private var state = CompositionState()
     private let backend = RuleBasedConversionBackend()
     private let memoryStore = MemoryStore()
+    private let idleConversionPolicy = IdleConversionPolicy()
+    private var idleTimer: Timer?
+    private var lastInputAt: Date?
 
     public override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard event.type == .keyDown else {
@@ -35,6 +38,7 @@ public final class RomajimeInputController: IMKInputController {
 
         state.append(character)
         updateMarkedText(client: sender)
+        scheduleIdleConversion(client: sender)
         return true
     }
 
@@ -54,16 +58,13 @@ public final class RomajimeInputController: IMKInputController {
             }
             state.append(" ")
             updateMarkedText(client: sender)
+            scheduleIdleConversion(client: sender)
             return true
         case 36, 76:
             guard state.isComposing else {
                 return false
             }
-            if event.modifierFlags.contains(.control) {
-                convertAndCommit(client: sender)
-            } else {
-                commitRawText(client: sender)
-            }
+            commitRawText(client: sender)
             return true
         case 51:
             guard state.isComposing else {
@@ -72,7 +73,9 @@ public final class RomajimeInputController: IMKInputController {
             state.deleteBackward()
             if state.isComposing {
                 updateMarkedText(client: sender)
+                scheduleIdleConversion(client: sender)
             } else {
+                cancelIdleConversion()
                 clearMarkedText(client: sender)
             }
             return true
@@ -81,6 +84,7 @@ public final class RomajimeInputController: IMKInputController {
                 return false
             }
             state.clear()
+            cancelIdleConversion()
             clearMarkedText(client: sender)
             return true
         default:
@@ -89,13 +93,39 @@ public final class RomajimeInputController: IMKInputController {
     }
 
     private func convertAndCommit(client sender: Any!) {
+        cancelIdleConversion()
         let request = ConversionRequest(raw: state.buffer, memory: memoryStore.loadMemory(), kanaCandidate: nil)
         let result = (try? backend.convert(request)) ?? ConversionResult(converted: state.buffer, refined: state.buffer, confidence: 0, candidates: [])
         commit(result.candidates.first?.text ?? state.buffer, client: sender)
     }
 
     private func commitRawText(client sender: Any!) {
+        cancelIdleConversion()
         commit(state.buffer, client: sender)
+    }
+
+    private func scheduleIdleConversion(client sender: Any!) {
+        cancelIdleConversion()
+        guard state.isComposing, !state.buffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
+
+        let now = Date()
+        let interval = lastInputAt.map { now.timeIntervalSince($0) }
+        lastInputAt = now
+        let delay = idleConversionPolicy.delay(afterKeystrokeInterval: interval)
+        let client = sender as AnyObject
+        idleTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self, weak client] _ in
+            guard let self, let client else {
+                return
+            }
+            self.convertAndCommit(client: client)
+        }
+    }
+
+    private func cancelIdleConversion() {
+        idleTimer?.invalidate()
+        idleTimer = nil
     }
 
     private func updateMarkedText(client sender: Any!) {
@@ -117,6 +147,7 @@ public final class RomajimeInputController: IMKInputController {
         }
         inputClient(sender)?.insertText(text, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
         state.clear()
+        lastInputAt = nil
     }
 }
 
