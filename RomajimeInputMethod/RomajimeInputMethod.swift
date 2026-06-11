@@ -15,13 +15,18 @@ public final class RomajimeInputController: IMKInputController {
     private var state = CompositionState()
     private let backend = RuleBasedConversionBackend()
     private let memoryStore = MemoryStore()
-    private let idleConversionPolicy = IdleConversionPolicy()
+    private let configStore = ConfigStore()
+    private lazy var config = configStore.load()
+    private lazy var idleConversionPolicy = IdleConversionPolicy(
+        baseDelay: config.timing.idleBaseDelay,
+        fastTypingDelay: config.timing.idleFastTypingDelay,
+        fastTypingThreshold: config.timing.idleFastTypingThreshold
+    )
     private var idleTimer: Timer?
     private var lastInputAt: Date?
     private var jumpTargets: [JumpTarget] = []
     private var jumpLabelBuffer = ""
     private var jumpModeTimer: Timer?
-    private let jumpModeTimeout: TimeInterval = 3.0
 
     public override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard event.type == .keyDown else {
@@ -59,8 +64,7 @@ public final class RomajimeInputController: IMKInputController {
     }
 
     private func handleCommand(_ event: NSEvent, client sender: Any!) -> Bool {
-        switch event.keyCode {
-        case 49:
+        if event.matches(config.keyBindings.bufferSpace) {
             guard state.isComposing else {
                 return false
             }
@@ -68,12 +72,16 @@ public final class RomajimeInputController: IMKInputController {
             updateMarkedText(client: sender)
             scheduleIdleConversion(client: sender)
             return true
-        case 36, 76:
+        }
+
+        if config.keyBindings.ignoredCommit.contains(where: event.matches(_:)) {
             guard state.isComposing else {
                 return false
             }
             return true
-        case 51:
+        }
+
+        if event.matches(config.keyBindings.deleteBackward) {
             guard state.isComposing else {
                 return false
             }
@@ -86,16 +94,18 @@ public final class RomajimeInputController: IMKInputController {
                 clearMarkedText(client: sender)
             }
             return true
-        case 53:
+        }
+
+        if event.matches(config.keyBindings.convertOrJump) {
             if state.isComposing {
                 convertAndCommit(client: sender)
             } else {
                 enterJumpMode(client: sender)
             }
             return true
-        default:
-            return false
         }
+
+        return false
     }
 
     private func convertAndCommit(client sender: Any!) {
@@ -140,12 +150,12 @@ public final class RomajimeInputController: IMKInputController {
             return false
         }
 
-        if event.keyCode == 53 {
+        if event.matches(config.keyBindings.jumpCancel) {
             exitJumpMode()
             return true
         }
 
-        if event.keyCode == 49 {
+        if event.matches(config.keyBindings.jumpConfirm) {
             if let target = jumpTarget(matching: jumpLabelBuffer) {
                 jump(to: target, client: sender)
             } else {
@@ -210,7 +220,7 @@ public final class RomajimeInputController: IMKInputController {
 
     private func scheduleJumpModeTimeout() {
         cancelJumpModeTimeout()
-        jumpModeTimer = Timer.scheduledTimer(timeInterval: jumpModeTimeout, target: self, selector: #selector(jumpModeTimerFired(_:)), userInfo: nil, repeats: false)
+        jumpModeTimer = Timer.scheduledTimer(timeInterval: config.timing.jumpModeTimeout, target: self, selector: #selector(jumpModeTimerFired(_:)), userInfo: nil, repeats: false)
     }
 
     private func cancelJumpModeTimeout() {
@@ -271,5 +281,32 @@ private final class MemoryStore {
         let url = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Romajime/memory.md")
         return (try? String(contentsOf: url, encoding: .utf8)) ?? "mtg -> ミーティング\ntodo -> TODO\n"
+    }
+}
+
+private final class ConfigStore {
+    func load() -> RomajimeConfig {
+        guard let data = try? Data(contentsOf: configURL) else {
+            return RomajimeConfig()
+        }
+        return (try? JSONDecoder().decode(RomajimeConfig.self, from: data)) ?? RomajimeConfig()
+    }
+
+    private var configURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/Romajime/config.json")
+    }
+}
+
+private extension NSEvent {
+    func matches(_ stroke: KeyStroke) -> Bool {
+        guard keyCode == stroke.keyCode else {
+            return false
+        }
+        guard let requiredModifiers = stroke.requiredModifiers else {
+            return true
+        }
+        let relevantFlags = modifierFlags.intersection(.deviceIndependentFlagsMask).rawValue
+        return relevantFlags == requiredModifiers
     }
 }

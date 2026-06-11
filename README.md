@@ -34,6 +34,40 @@ InputMethodKit marked text.
 
 The shared conversion core lives in `RomajimeCore` so later AI conversion and iOS keyboard work can reuse the same state and backend contracts.
 
+## Configuration
+
+Romajime reads optional configuration from:
+
+```text
+~/Library/Application Support/Romajime/config.json
+```
+
+If the file is missing or invalid, Romajime uses the defaults below. Text input
+keys are not configurable; only non-input control keys and timings are.
+
+```json
+{
+  "keyBindings": {
+    "bufferSpace": { "keyCode": 49 },
+    "ignoredCommit": [{ "keyCode": 36 }, { "keyCode": 76 }],
+    "deleteBackward": { "keyCode": 51 },
+    "convertOrJump": { "keyCode": 53 },
+    "jumpConfirm": { "keyCode": 49 },
+    "jumpCancel": { "keyCode": 53 }
+  },
+  "timing": {
+    "idleBaseDelay": 1.2,
+    "idleFastTypingDelay": 1.8,
+    "idleFastTypingThreshold": 0.18,
+    "jumpModeTimeout": 3.0
+  }
+}
+```
+
+Default key codes are: Space `49`, Return `36`, keypad Enter `76`, Delete `51`,
+Escape `53`. Add `"requiredModifiers"` when a binding should only match an
+exact modifier mask.
+
 ## Build and Install (Recommended: Using Justfile)
 
 ### Prerequisites

@@ -64,6 +64,18 @@ final class RomajimeCoreTests: XCTestCase {
         XCTAssertEqual(JumpLabelGenerator.labels(for: 26), ["aa", "27"])
     }
 
+    func testConfigCodableKeepsDefaultKeyBindings() throws {
+        let config = RomajimeConfig()
+        let data = try JSONEncoder().encode(config)
+        let decoded = try JSONDecoder().decode(RomajimeConfig.self, from: data)
+        XCTAssertEqual(decoded.keyBindings.bufferSpace, KeyStroke(keyCode: 49))
+        XCTAssertEqual(decoded.keyBindings.ignoredCommit, [KeyStroke(keyCode: 36), KeyStroke(keyCode: 76)])
+        XCTAssertEqual(decoded.keyBindings.deleteBackward, KeyStroke(keyCode: 51))
+        XCTAssertEqual(decoded.keyBindings.convertOrJump, KeyStroke(keyCode: 53))
+        XCTAssertEqual(decoded.keyBindings.jumpConfirm, KeyStroke(keyCode: 49))
+        XCTAssertEqual(decoded.keyBindings.jumpCancel, KeyStroke(keyCode: 53))
+    }
+
     func testTextUnitScannerUsesPhraseBoundariesNotWhitespace() {
         let targets = TextUnitScanner.jumpTargets(in: "koreha yameru. motto chobun\n  もっと 長文。", baseLocation: 10)
         XCTAssertEqual(targets.map(\.label), ["a", "b", "c"])

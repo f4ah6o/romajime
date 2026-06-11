@@ -87,6 +87,70 @@ public struct IdleConversionPolicy: Equatable, Sendable {
     }
 }
 
+public struct RomajimeConfig: Codable, Equatable, Sendable {
+    public var keyBindings: KeyBindings
+    public var timing: Timing
+
+    public init(keyBindings: KeyBindings = KeyBindings(), timing: Timing = Timing()) {
+        self.keyBindings = keyBindings
+        self.timing = timing
+    }
+}
+
+public struct KeyBindings: Codable, Equatable, Sendable {
+    public var bufferSpace: KeyStroke
+    public var ignoredCommit: [KeyStroke]
+    public var deleteBackward: KeyStroke
+    public var convertOrJump: KeyStroke
+    public var jumpConfirm: KeyStroke
+    public var jumpCancel: KeyStroke
+
+    public init(
+        bufferSpace: KeyStroke = KeyStroke(keyCode: 49),
+        ignoredCommit: [KeyStroke] = [KeyStroke(keyCode: 36), KeyStroke(keyCode: 76)],
+        deleteBackward: KeyStroke = KeyStroke(keyCode: 51),
+        convertOrJump: KeyStroke = KeyStroke(keyCode: 53),
+        jumpConfirm: KeyStroke = KeyStroke(keyCode: 49),
+        jumpCancel: KeyStroke = KeyStroke(keyCode: 53)
+    ) {
+        self.bufferSpace = bufferSpace
+        self.ignoredCommit = ignoredCommit
+        self.deleteBackward = deleteBackward
+        self.convertOrJump = convertOrJump
+        self.jumpConfirm = jumpConfirm
+        self.jumpCancel = jumpCancel
+    }
+}
+
+public struct KeyStroke: Codable, Equatable, Sendable {
+    public var keyCode: UInt16
+    public var requiredModifiers: UInt?
+
+    public init(keyCode: UInt16, requiredModifiers: UInt? = nil) {
+        self.keyCode = keyCode
+        self.requiredModifiers = requiredModifiers
+    }
+}
+
+public struct Timing: Codable, Equatable, Sendable {
+    public var idleBaseDelay: TimeInterval
+    public var idleFastTypingDelay: TimeInterval
+    public var idleFastTypingThreshold: TimeInterval
+    public var jumpModeTimeout: TimeInterval
+
+    public init(
+        idleBaseDelay: TimeInterval = 1.2,
+        idleFastTypingDelay: TimeInterval = 1.8,
+        idleFastTypingThreshold: TimeInterval = 0.18,
+        jumpModeTimeout: TimeInterval = 3.0
+    ) {
+        self.idleBaseDelay = idleBaseDelay
+        self.idleFastTypingDelay = idleFastTypingDelay
+        self.idleFastTypingThreshold = idleFastTypingThreshold
+        self.jumpModeTimeout = jumpModeTimeout
+    }
+}
+
 public struct JumpTarget: Equatable, Sendable {
     public var label: String
     public var text: String
