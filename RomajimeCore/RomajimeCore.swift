@@ -139,6 +139,8 @@ public struct CompositionState: Equatable, Sendable {
 }
 
 public enum CompositionNormalizer {
+    private static let acceptedPunctuation: Set<Character> = [" ", ".", ",", "?", "!", "'", "-", ":", ";", "(", ")", "[", "]", "\""]
+
     public static func normalizeWhitespace(_ input: String) -> String {
         input.split { $0.isWhitespace }.joined(separator: " ")
     }
@@ -147,7 +149,7 @@ public enum CompositionNormalizer {
         guard character.unicodeScalars.count == 1, let scalar = character.unicodeScalars.first else {
             return false
         }
-        return CharacterSet.letters.contains(scalar) && scalar.isASCII || character == "'" || character == "-" || character == " "
+        return CharacterSet.letters.contains(scalar) && scalar.isASCII || acceptedPunctuation.contains(character)
     }
 }
 
@@ -192,15 +194,41 @@ public struct RomajiDictionary: Sendable {
 
     public func convert(_ input: String) -> String {
         var output = ""
-        var index = input.startIndex
-        while index < input.endIndex {
-            let character = input[index]
-            guard isRomajiScalar(character) else {
-                output.append(character)
-                index = input.index(after: index)
+        var run = ""
+
+        for character in input {
+            if isRomajiScalar(character) {
+                run.append(character)
                 continue
             }
 
+            if !run.isEmpty {
+                output += convertRun(run)
+                run.removeAll()
+            }
+            output.append(character)
+        }
+
+        if !run.isEmpty {
+            output += convertRun(run)
+        }
+
+        return output
+    }
+
+    private func convertRun(_ run: String) -> String {
+        let converted = convertConvertibleRun(run)
+        if converted.unicodeScalars.contains(where: { $0.isASCII && CharacterSet.letters.contains($0) }) {
+            return run
+        }
+        return converted
+    }
+
+    private func convertConvertibleRun(_ input: String) -> String {
+        var output = ""
+        var index = input.startIndex
+        while index < input.endIndex {
+            let character = input[index]
             let rest = String(input[index...]).lowercased()
             if let matched = longestMatch(in: rest) {
                 output += matched.kana

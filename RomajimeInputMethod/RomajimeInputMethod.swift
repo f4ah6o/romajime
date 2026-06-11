@@ -39,7 +39,7 @@ public final class RomajimeInputController: IMKInputController {
     }
 
     public override func commitComposition(_ sender: Any!) {
-        commitCurrentText(client: sender)
+        commitRawText(client: sender)
     }
 
     public override func candidates(_ sender: Any!) -> [Any]! {
@@ -52,24 +52,18 @@ public final class RomajimeInputController: IMKInputController {
             guard state.isComposing else {
                 return false
             }
-            if event.modifierFlags.contains(.option) || event.modifierFlags.contains(.control) {
-                convertOrCycle(client: sender)
-                return true
-            }
             state.append(" ")
             updateMarkedText(client: sender)
-            return true
-        case 38:
-            guard state.isComposing, event.modifierFlags.contains(.control) else {
-                return false
-            }
-            convertOrCycle(client: sender)
             return true
         case 36, 76:
             guard state.isComposing else {
                 return false
             }
-            commitCurrentText(client: sender)
+            if event.modifierFlags.contains(.control) {
+                convertAndCommit(client: sender)
+            } else {
+                commitRawText(client: sender)
+            }
             return true
         case 51:
             guard state.isComposing else {
@@ -94,31 +88,18 @@ public final class RomajimeInputController: IMKInputController {
         }
     }
 
-    private func convertOrCycle(client sender: Any!) {
-        if state.candidates.isEmpty {
-            let request = ConversionRequest(raw: state.buffer, memory: memoryStore.loadMemory(), kanaCandidate: nil)
-            let result = (try? backend.convert(request)) ?? ConversionResult(converted: state.buffer, refined: state.buffer, confidence: 0, candidates: [])
-            state.setCandidates(result.candidates)
-        } else {
-            state.selectNextCandidate()
-        }
-        updateMarkedText(client: sender)
+    private func convertAndCommit(client sender: Any!) {
+        let request = ConversionRequest(raw: state.buffer, memory: memoryStore.loadMemory(), kanaCandidate: nil)
+        let result = (try? backend.convert(request)) ?? ConversionResult(converted: state.buffer, refined: state.buffer, confidence: 0, candidates: [])
+        commit(result.candidates.first?.text ?? state.buffer, client: sender)
     }
 
-    private func commitCurrentText(client sender: Any!) {
-        if state.selectedCandidate == nil {
-            convertOrCycle(client: sender)
-        }
-        let text = state.selectedCandidate?.text ?? state.buffer
-        guard !text.isEmpty else {
-            return
-        }
-        inputClient(sender)?.insertText(text, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
-        state.clear()
+    private func commitRawText(client sender: Any!) {
+        commit(state.buffer, client: sender)
     }
 
     private func updateMarkedText(client sender: Any!) {
-        let text = state.selectedCandidate?.text ?? state.buffer
+        let text = state.buffer
         inputClient(sender)?.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
     }
 
@@ -128,6 +109,14 @@ public final class RomajimeInputController: IMKInputController {
 
     private func inputClient(_ sender: Any!) -> (any IMKTextInput)? {
         sender as? any IMKTextInput
+    }
+
+    private func commit(_ text: String, client sender: Any!) {
+        guard !text.isEmpty else {
+            return
+        }
+        inputClient(sender)?.insertText(text, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+        state.clear()
     }
 }
 

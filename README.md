@@ -8,9 +8,9 @@ Phase 1 is implemented:
 
 - Buffer romaji input in an InputMethodKit controller.
 - Keep spaces in the composition buffer for long-form romaji drafts.
-- Convert with Option+Space or Control+J.
-- Cycle candidates by repeating Option+Space or Control+J.
-- Convert and commit with Enter.
+- Do not do IME-style conversion or candidate cycling while typing.
+- Commit raw draft text with Enter.
+- Convert the whole buffered draft with Control+Enter.
 - Cancel with Escape.
 - Use a rule-based romaji-to-kana core with simple `memory.md` term replacement.
 

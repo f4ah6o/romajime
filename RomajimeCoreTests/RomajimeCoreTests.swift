@@ -8,7 +8,7 @@ final class RomajimeCoreTests: XCTestCase {
         XCTAssertEqual(result.candidates.first?.text, "きょう ミーティング で TODO")
     }
 
-    func testCompositionStateCyclesCandidates() {
+    func testCompositionStateCanStillHoldCandidatesForFutureBackends() {
         var state = CompositionState()
         state.append("k")
         state.append("a")
@@ -26,8 +26,8 @@ final class RomajimeCoreTests: XCTestCase {
     func testSpaceCanBeBufferedForLongFormInput() throws {
         XCTAssertTrue(CompositionNormalizer.acceptsRomajiCharacter(" "))
         let backend = RuleBasedConversionBackend()
-        let result = try backend.convert(.init(raw: "koreha yameru. motto chobunwokakitai"))
-        XCTAssertEqual(result.candidates.first?.text, "これは やめる. もっと ちょぶんをかきたい")
+        let result = try backend.convert(.init(raw: "tadahitasura type sitainoto. typo ya hennkann kannjinorennsouwoyamete"))
+        XCTAssertEqual(result.candidates.first?.text, "ただひたすら type したいのと. typo や へんかん かんじのれんそうをやめて")
     }
 
     func testBackspaceClearsCandidates() {
