@@ -43,7 +43,7 @@ public final class RomajimeInputController: IMKInputController {
     }
 
     public override func commitComposition(_ sender: Any!) {
-        commitRawText(client: sender)
+        convertAndCommit(client: sender)
     }
 
     public override func candidates(_ sender: Any!) -> [Any]! {
@@ -64,7 +64,6 @@ public final class RomajimeInputController: IMKInputController {
             guard state.isComposing else {
                 return false
             }
-            commitRawText(client: sender)
             return true
         case 51:
             guard state.isComposing else {
@@ -99,11 +98,6 @@ public final class RomajimeInputController: IMKInputController {
         commit(result.candidates.first?.text ?? state.buffer, client: sender)
     }
 
-    private func commitRawText(client sender: Any!) {
-        cancelIdleConversion()
-        commit(state.buffer, client: sender)
-    }
-
     private func scheduleIdleConversion(client sender: Any!) {
         cancelIdleConversion()
         guard state.isComposing, !state.buffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -115,12 +109,14 @@ public final class RomajimeInputController: IMKInputController {
         lastInputAt = now
         let delay = idleConversionPolicy.delay(afterKeystrokeInterval: interval)
         let client = sender as AnyObject
-        idleTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self, weak client] _ in
-            guard let self, let client else {
-                return
-            }
-            self.convertAndCommit(client: client)
+        idleTimer = Timer.scheduledTimer(timeInterval: delay, target: self, selector: #selector(idleTimerFired(_:)), userInfo: client, repeats: false)
+    }
+
+    @objc private func idleTimerFired(_ timer: Timer) {
+        guard let client = timer.userInfo else {
+            return
         }
+        convertAndCommit(client: client)
     }
 
     private func cancelIdleConversion() {

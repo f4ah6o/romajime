@@ -10,7 +10,8 @@ Phase 1 is implemented:
 - Keep spaces in the composition buffer for long-form romaji drafts.
 - Do not do IME-style conversion or candidate cycling while typing.
 - Convert and commit the whole buffered draft automatically after typing pauses.
-- Commit raw draft text with Enter.
+- Ignore Enter while composing, so chat-style Send shortcuts do not become an
+  accidental raw commit path.
 - Cancel with Escape.
 - Use a rule-based romaji-to-kana core with simple `memory.md` term replacement.
 
