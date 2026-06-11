@@ -52,6 +52,17 @@ public final class RomajimeInputController: IMKInputController {
             guard state.isComposing else {
                 return false
             }
+            if event.modifierFlags.contains(.option) || event.modifierFlags.contains(.control) {
+                convertOrCycle(client: sender)
+                return true
+            }
+            state.append(" ")
+            updateMarkedText(client: sender)
+            return true
+        case 38:
+            guard state.isComposing, event.modifierFlags.contains(.control) else {
+                return false
+            }
             convertOrCycle(client: sender)
             return true
         case 36, 76:
@@ -95,6 +106,9 @@ public final class RomajimeInputController: IMKInputController {
     }
 
     private func commitCurrentText(client sender: Any!) {
+        if state.selectedCandidate == nil {
+            convertOrCycle(client: sender)
+        }
         let text = state.selectedCandidate?.text ?? state.buffer
         guard !text.isEmpty else {
             return

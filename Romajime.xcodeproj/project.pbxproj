@@ -90,6 +90,7 @@
 		4F4510F15B4947A611C5353E /* RomajimeCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomajimeCore.swift; sourceTree = "<group>"; };
 		4FB18F37EA059B13A63ACCD4 /* RomajimeCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RomajimeCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		61D6783C85D69D747CF80C98 /* InputMethodKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = InputMethodKit.framework; path = System/Library/Frameworks/InputMethodKit.framework; sourceTree = SDKROOT; };
+		7DD3C05FB5E302AE39173DFC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8C2C3A09D0703B90051F4622 /* RomajimeInputMethod.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RomajimeInputMethod.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B16026A92A4124EFE440F65F /* Romajime.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Romajime.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E5659431F442521A694C5CF1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -188,6 +189,7 @@
 		9E295AD3B32241C755824BEE /* RomajimeCoreTests */ = {
 			isa = PBXGroup;
 			children = (
+				7DD3C05FB5E302AE39173DFC /* Info.plist */,
 				30874A221973883297248637 /* RomajimeCoreTests.swift */,
 			);
 			path = RomajimeCoreTests;
@@ -483,6 +485,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = RomajimeCoreTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -558,6 +561,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = RomajimeCoreTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

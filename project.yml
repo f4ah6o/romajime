@@ -87,6 +87,11 @@ targets:
       - RomajimeCoreTests
     dependencies:
       - target: RomajimeCore
+    info:
+      path: RomajimeCoreTests/Info.plist
+      properties:
+        CFBundleName: RomajimeCoreTests
+        CFBundlePackageType: BNDL
 schemes:
   Romajime:
     build:

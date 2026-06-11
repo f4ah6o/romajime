@@ -23,6 +23,13 @@ final class RomajimeCoreTests: XCTestCase {
         XCTAssertEqual(state.selectedCandidate?.text, "か")
     }
 
+    func testSpaceCanBeBufferedForLongFormInput() throws {
+        XCTAssertTrue(CompositionNormalizer.acceptsRomajiCharacter(" "))
+        let backend = RuleBasedConversionBackend()
+        let result = try backend.convert(.init(raw: "koreha yameru. motto chobunwokakitai"))
+        XCTAssertEqual(result.candidates.first?.text, "これは やめる. もっと ちょぶんをかきたい")
+    }
+
     func testBackspaceClearsCandidates() {
         var state = CompositionState()
         state.append("t")

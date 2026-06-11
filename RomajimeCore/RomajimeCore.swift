@@ -147,7 +147,7 @@ public enum CompositionNormalizer {
         guard character.unicodeScalars.count == 1, let scalar = character.unicodeScalars.first else {
             return false
         }
-        return CharacterSet.letters.contains(scalar) && scalar.isASCII || character == "'" || character == "-"
+        return CharacterSet.letters.contains(scalar) && scalar.isASCII || character == "'" || character == "-" || character == " "
     }
 }
 

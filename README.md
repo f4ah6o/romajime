@@ -7,9 +7,10 @@ Romajime is a macOS InputMethodKit proof of concept for typing Japanese from rom
 Phase 1 is implemented:
 
 - Buffer romaji input in an InputMethodKit controller.
-- Convert with Space.
-- Cycle candidates with repeated Space.
-- Commit with Enter.
+- Keep spaces in the composition buffer for long-form romaji drafts.
+- Convert with Option+Space or Control+J.
+- Cycle candidates by repeating Option+Space or Control+J.
+- Convert and commit with Enter.
 - Cancel with Escape.
 - Use a rule-based romaji-to-kana core with simple `memory.md` term replacement.
 
