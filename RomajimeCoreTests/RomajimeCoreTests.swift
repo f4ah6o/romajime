@@ -58,10 +58,11 @@ final class RomajimeCoreTests: XCTestCase {
         XCTAssertEqual(JumpLabelGenerator.label(for: 26), "27")
     }
 
-    func testTextUnitScannerUsesWhitespaceAndJapanesePunctuationBoundaries() {
-        let targets = TextUnitScanner.jumpTargets(in: "koreha yameru。もっと 長文", baseLocation: 10)
-        XCTAssertEqual(targets.map(\.label), ["1", "2", "3", "4"])
-        XCTAssertEqual(targets.map(\.text), ["koreha", "yameru", "もっと", "長文"])
-        XCTAssertEqual(targets.first?.range, NSRange(location: 10, length: 6))
+    func testTextUnitScannerUsesLineBoundaries() {
+        let targets = TextUnitScanner.jumpTargets(in: "koreha yameru\n\nもっと 長文", baseLocation: 10)
+        XCTAssertEqual(targets.map(\.label), ["1", "2"])
+        XCTAssertEqual(targets.map(\.text), ["koreha yameru", "もっと 長文"])
+        XCTAssertEqual(targets.first?.range, NSRange(location: 10, length: 13))
+        XCTAssertEqual(targets.last?.range.location, 25)
     }
 }
