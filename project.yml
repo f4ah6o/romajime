@@ -1,0 +1,98 @@
+name: Romajime
+options:
+  bundleIdPrefix: com.f12o
+  deploymentTarget:
+    macOS: "14.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGNING_ALLOWED: "NO"
+targets:
+  Romajime:
+    type: application
+    platform: macOS
+    sources:
+      - RomajimeApp
+    dependencies:
+      - target: RomajimeCore
+    info:
+      path: RomajimeApp/Info.plist
+      properties:
+        CFBundleDisplayName: Romajime
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: ""
+  RomajimeCore:
+    type: framework
+    platform: macOS
+    sources:
+      - RomajimeCore
+    info:
+      path: RomajimeCore/Info.plist
+      properties:
+        CFBundleName: RomajimeCore
+        CFBundlePackageType: FMWK
+  RomajimeInputMethod:
+    type: application
+    platform: macOS
+    sources:
+      - RomajimeInputMethod
+    dependencies:
+      - sdk: InputMethodKit.framework
+      - target: RomajimeCore
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.f12o.Romajime.inputmethod
+        SKIP_INSTALL: "NO"
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @loader_path/../Frameworks @loader_path/../../../../Frameworks"
+    info:
+      path: RomajimeInputMethod/Info.plist
+      properties:
+        CFBundleDisplayName: Romajime
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundleName: Romajime
+        CFBundlePackageType: APPL
+        CFBundleIdentifier: com.f12o.Romajime.inputmethod
+        LSBackgroundOnly: true
+        LSUIElement: true
+        NSPrincipalClass: NSApplication
+        InputMethodConnectionName: Romajime_1_Connection
+        InputMethodServerControllerClass: RomajimeInputMethod.RomajimeInputController
+        ComponentInputModeDict:
+          TISUnifiedUIForInputMethodEnabling: true
+          tsVisibleInputModeOrderedArrayKey:
+            - com.apple.inputmethod.Japanese
+          tsInputModeListKey:
+            com.apple.inputmethod.Japanese:
+              TISInputSourceID: com.f12o.Romajime.inputmethod.Japanese
+              TISIntendedLanguage: ja
+              tsInputModeDefaultStateKey: true
+              tsInputModeIsVisibleKey: true
+              tsInputModeKeyEquivalentKey: R
+              tsInputModeKeyEquivalentModifiersKey: 4608
+              tsInputModePrimaryInScriptKey: true
+              tsInputModeScriptKey: smJapanese
+        tsInputMethodCharacterRepertoireKey:
+          - Latn
+          - Hira
+          - Kana
+        tsInputMethodIconFileKey: ""
+        TISIntendedLanguage: ja
+  RomajimeCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - RomajimeCoreTests
+    dependencies:
+      - target: RomajimeCore
+schemes:
+  Romajime:
+    build:
+      targets:
+        Romajime: all
+        RomajimeInputMethod: all
+        RomajimeCoreTests: [test]
+    test:
+      targets:
+        - RomajimeCoreTests
