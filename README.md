@@ -1,6 +1,6 @@
-# Romajime
+# romajime
 
-Romajime is a macOS InputMethodKit proof of concept for typing Japanese from romaji.
+romajime is a macOS InputMethodKit proof of concept for typing Japanese from romaji.
 
 ## Current Phase
 
@@ -20,7 +20,7 @@ Phase 1 is implemented:
 
 The default idle conversion delay is 1.2 seconds. Very fast typing extends that
 wait to 1.8 seconds so long-form drafting is less likely to be interrupted.
-Romajime does not require Control+Enter or Command+Enter because those keys are
+romajime does not require Control+Enter or Command+Enter because those keys are
 often used as Send shortcuts in chat apps.
 
 Jump mode reads nearby text from the active `IMKTextInput`, groups it into
@@ -36,13 +36,13 @@ The shared conversion core lives in `RomajimeCore` so later AI conversion and iO
 
 ## Configuration
 
-Romajime reads optional configuration from:
+romajime reads optional configuration from:
 
 ```text
 ~/Library/Application Support/Romajime/config.json
 ```
 
-If the file is missing or invalid, Romajime uses the defaults below. Text input
+If the file is missing or invalid, romajime uses the defaults below. Text input
 keys are not configurable; only non-input control keys and timings are.
 
 ```json
@@ -82,8 +82,8 @@ exact modifier mask.
 # Build, sign, install to ~/Library/Input Methods, and register (no reboot needed)
 just install
 
-# Then add Romajime manually:
-#   System Settings → Keyboard → Input Sources → Edit → '+' → Japanese → Romajime → Add
+# Then add romajime manually:
+#   System Settings → Keyboard → Input Sources → Edit → '+' → Japanese → romajime → Add
 
 # Verify registration / show test steps
 just check
@@ -145,7 +145,7 @@ required all of the following — `just install` handles every step:
 
 ## Memory
 
-Romajime reads optional term replacements from:
+romajime reads optional term replacements from:
 
 ```text
 ~/Library/Application Support/Romajime/memory.md
