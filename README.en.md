@@ -43,9 +43,10 @@ larger phrases using punctuation and newlines rather than every whitespace
 separated word, then moves the insertion point to the chosen phrase when Space
 confirms the typed label. Alphabet labels run `a` through `z`, then `aa`, `ab`,
 and so on; numeric aliases run `1`, `2`, `3`, and so on. Jump mode cancels after
-3 seconds of inactivity. Inline visual link overlays are not implemented yet;
-that likely needs a companion accessibility overlay rather than pure
-InputMethodKit marked text.
+3 seconds of inactivity. Each visible jump target gets a short-lived link-like
+label badge near the phrase start. If the client app does not provide character
+position rectangles, romajime skips only the badge overlay and keeps keyboard
+jumping available.
 
 The shared conversion core lives in `RomajimeCore` so later AI conversion and iOS keyboard work can reuse the same state and backend contracts.
 

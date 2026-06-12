@@ -33,6 +33,7 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
     private var commitRequestID = 0
     private var pendingCommitClient: Any?
     var kanjiBackend: any KanjiConversionBackend = FoundationModelsKanjiBackend()
+    private let jumpOverlayController = JumpOverlayController()
     private var jumpTargets: [JumpTarget] = []
     private var jumpLabelBuffer = ""
     private var jumpModeTimer: Timer?
@@ -65,6 +66,7 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
     }
 
     public override func commitComposition(_ sender: Any!) {
+        exitJumpMode()
         // The OS expects the composition resolved synchronously here (focus
         // loss, input-source switch), so skip the async kanji pass.
         convertAndCommit(client: sender, allowAsync: false)
@@ -72,6 +74,16 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
 
     public override func candidates(_ sender: Any!) -> [Any]! {
         state.candidates.map(\.text)
+    }
+
+    public override func hidePalettes() {
+        super.hidePalettes()
+        exitJumpMode()
+    }
+
+    public override func inputControllerWillClose() {
+        super.inputControllerWillClose()
+        exitJumpMode()
     }
 
     private func handleCommand(_ event: NSEvent, client sender: Any!) -> Bool {
@@ -266,6 +278,7 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
 
         jumpLabelBuffer.append(character)
         if hasJumpTarget(withPrefix: jumpLabelBuffer) {
+            jumpOverlayController.update(activePrefix: jumpLabelBuffer)
             scheduleJumpModeTimeout()
             return true
         }
@@ -298,12 +311,14 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
         if jumpTargets.isEmpty {
             NSSound.beep()
         } else {
+            jumpOverlayController.show(targets: jumpTargets, client: client)
             scheduleJumpModeTimeout()
         }
     }
 
     private func exitJumpMode() {
         cancelJumpModeTimeout()
+        jumpOverlayController.hide()
         jumpTargets.removeAll()
         jumpLabelBuffer.removeAll()
     }

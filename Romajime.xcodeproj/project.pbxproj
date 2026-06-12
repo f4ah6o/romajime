@@ -18,6 +18,7 @@
 		82A604ED45C164C47E57473E /* FoundationModelsKanjiBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A51F33123E09B386ED90362 /* FoundationModelsKanjiBackend.swift */; };
 		9A9555AE5F874FEDD3919FBE /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08CD80ADDDF7836B8FD00657 /* main.swift */; };
 		9C2EBAB21EB6A01DE12EA721 /* RomajimeCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30874A221973883297248637 /* RomajimeCoreTests.swift */; };
+		A16C6643E8086840F69BBD18 /* JumpOverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E10EF857F8DDB7B7A1C597D /* JumpOverlayController.swift */; };
 		B5628A406D8166F6BDFE601B /* RomajimeCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FF422929657525E07DC88766 /* RomajimeCore.framework */; };
 		B75992D03C08C0D784DB2C79 /* RomajimeCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FF422929657525E07DC88766 /* RomajimeCore.framework */; };
 		D6183E872F876D88F03A75B7 /* RomajimeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E266651CAECA71C6A2EC3C /* RomajimeApp.swift */; };
@@ -91,6 +92,7 @@
 		1D8BE175AB9E6128AFA5ACB7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		21E266651CAECA71C6A2EC3C /* RomajimeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomajimeApp.swift; sourceTree = "<group>"; };
 		2A51F33123E09B386ED90362 /* FoundationModelsKanjiBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoundationModelsKanjiBackend.swift; sourceTree = "<group>"; };
+		2E10EF857F8DDB7B7A1C597D /* JumpOverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JumpOverlayController.swift; sourceTree = "<group>"; };
 		30874A221973883297248637 /* RomajimeCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomajimeCoreTests.swift; sourceTree = "<group>"; };
 		4F4510F15B4947A611C5353E /* RomajimeCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomajimeCore.swift; sourceTree = "<group>"; };
 		4FB18F37EA059B13A63ACCD4 /* RomajimeCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RomajimeCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -177,6 +179,7 @@
 			children = (
 				2A51F33123E09B386ED90362 /* FoundationModelsKanjiBackend.swift */,
 				E5659431F442521A694C5CF1 /* Info.plist */,
+				2E10EF857F8DDB7B7A1C597D /* JumpOverlayController.swift */,
 				08CD80ADDDF7836B8FD00657 /* main.swift */,
 				0B15C79D6566D7F78751A907 /* RomajimeInputMethod.swift */,
 			);
@@ -366,6 +369,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				82A604ED45C164C47E57473E /* FoundationModelsKanjiBackend.swift in Sources */,
+				A16C6643E8086840F69BBD18 /* JumpOverlayController.swift in Sources */,
 				03737C29E73DED7C49FCC726 /* RomajimeInputMethod.swift in Sources */,
 				9A9555AE5F874FEDD3919FBE /* main.swift in Sources */,
 			);
