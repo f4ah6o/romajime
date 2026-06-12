@@ -307,7 +307,7 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
 
     private func updateMarkedText(client sender: Any!) {
         let text = state.buffer
-        inputClient(sender)?.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+        inputClient(sender)?.setMarkedText(text, selectionRange: NSRange(location: text.utf16.count, length: 0), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
     }
 
     private func clearMarkedText(client sender: Any!) {
