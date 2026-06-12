@@ -67,9 +67,9 @@ targets:
         ComponentInputModeDict:
           TISUnifiedUIForInputMethodEnabling: true
           tsVisibleInputModeOrderedArrayKey:
-            - com.apple.inputmethod.Japanese
+            - romajime
           tsInputModeListKey:
-            com.apple.inputmethod.Japanese:
+            romajime:
               TISInputSourceID: com.f12o.inputmethod.Romajime.Japanese
               TISIntendedLanguage: ja
               tsInputModeDefaultStateKey: true

@@ -26,7 +26,7 @@
 		<true/>
 		<key>tsInputModeListKey</key>
 		<dict>
-			<key>com.apple.inputmethod.Japanese</key>
+			<key>romajime</key>
 			<dict>
 				<key>TISInputSourceID</key>
 				<string>com.f12o.inputmethod.Romajime.Japanese</string>
@@ -48,7 +48,7 @@
 		</dict>
 		<key>tsVisibleInputModeOrderedArrayKey</key>
 		<array>
-			<string>com.apple.inputmethod.Japanese</string>
+			<string>romajime</string>
 		</array>
 	</dict>
 	<key>InputMethodConnectionName</key>
