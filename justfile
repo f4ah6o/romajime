@@ -124,6 +124,40 @@ LSREGISTER := "/System/Library/Frameworks/CoreServices.framework/Frameworks/Laun
     @echo "     1 2 ... + Space      → jump to same phrase by number"
     @echo ""
 
+# Build the conversion-engine CLI (DerivedData/Build/Products/Debug/romajime-cli)
+@cli: _check-xcodegen
+    if [ ! -d "{{ PROJECT_ROOT }}/Romajime.xcodeproj" ]; then \
+        xcodegen generate; \
+    fi
+    xcodebuild \
+        -scheme {{ SCHEME }} \
+        -project {{ PROJECT_ROOT }}/Romajime.xcodeproj \
+        -configuration Debug \
+        -derivedDataPath {{ DERIVED_DATA }} \
+        -quiet \
+        build
+    @echo "✓ Built: {{ DERIVED_DATA }}/Build/Products/Debug/romajime-cli"
+
+# Convert romaji text with the CLI (e.g. `just convert "kyou ha kaigi"`)
+@convert TEXT *ARGS: cli
+    "{{ DERIVED_DATA }}/Build/Products/Debug/romajime-cli" {{ ARGS }} "{{ TEXT }}"
+
+# Rebuild the eval corpus from Claude Code / Codex prompt history (private, gitignored)
+@eval-collect:
+    python3 "{{ PROJECT_ROOT }}/eval/collect_prompts.py"
+
+# Run the kana-accuracy eval over the corpus (build CLI first)
+@eval *ARGS: cli
+    python3 "{{ PROJECT_ROOT }}/eval/run_eval.py" --cli "{{ DERIVED_DATA }}/Build/Products/Debug/romajime-cli" {{ ARGS }}
+
+# Eval including LLM kanji conversion on N random samples (slow)
+@eval-kanji N: cli
+    python3 "{{ PROJECT_ROOT }}/eval/run_eval.py" --cli "{{ DERIVED_DATA }}/Build/Products/Debug/romajime-cli" --kanji {{ N }}
+
+# Mine the opt-in commit log for learnable terms (add --dry-run to preview)
+@learn *ARGS: cli
+    "{{ DERIVED_DATA }}/Build/Products/Debug/romajime-cli" learn {{ ARGS }}
+
 # Run the app in development mode (not as input method)
 @dev-run: build _verify-build
     pkill -x Romajime 2>/dev/null || true

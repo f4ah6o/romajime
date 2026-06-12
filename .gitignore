@@ -5,3 +5,10 @@ build/
 *.xcuserdata/
 xcuserdata/
 .DS_Store
+
+# Eval artifacts derived from private prompt history — never commit
+eval/corpus_ja.txt
+eval/corpus.tsv
+eval/failures.tsv
+eval/history.jsonl
+eval/sources/

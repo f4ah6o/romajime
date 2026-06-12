@@ -1,16 +1,17 @@
 import Foundation
 import FoundationModels
-import RomajimeCore
 
-enum KanjiBackendError: Error {
+public enum KanjiBackendError: Error {
     case unavailable
 }
 
 // Each conversion uses a fresh session: LanguageModelSession keeps a growing
 // transcript, so reusing one across commits would bloat the context window.
 // prewarm() exists only to trigger the shared model load early.
-final class FoundationModelsKanjiBackend: KanjiConversionBackend, @unchecked Sendable {
-    func prewarm() {
+public final class FoundationModelsKanjiBackend: KanjiConversionBackend, @unchecked Sendable {
+    public init() {}
+
+    public func prewarm() {
         guard #available(macOS 26.0, *) else {
             return
         }
@@ -20,7 +21,7 @@ final class FoundationModelsKanjiBackend: KanjiConversionBackend, @unchecked Sen
         session.prewarm()
     }
 
-    func convertToKanji(_ request: KanjiConversionRequest) async throws -> String {
+    public func convertToKanji(_ request: KanjiConversionRequest) async throws -> String {
         guard #available(macOS 26.0, *), let session = makeSession() else {
             throw KanjiBackendError.unavailable
         }
@@ -38,8 +39,8 @@ final class FoundationModelsKanjiBackend: KanjiConversionBackend, @unchecked Sen
     }
 }
 
-enum KanjiConversionRunner {
-    static func run(backend: any KanjiConversionBackend, request: KanjiConversionRequest, timeout: TimeInterval) async -> String? {
+public enum KanjiConversionRunner {
+    public static func run(backend: any KanjiConversionBackend, request: KanjiConversionRequest, timeout: TimeInterval) async -> String? {
         await withTaskGroup(of: String?.self, returning: String?.self) { group in
             group.addTask {
                 try? await backend.convertToKanji(request)

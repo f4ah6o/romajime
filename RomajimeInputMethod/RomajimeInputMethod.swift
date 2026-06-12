@@ -14,10 +14,12 @@ final class InputMethodApplicationDelegate: NSObject, NSApplicationDelegate {
 @objc(RomajimeInputController)
 public final class RomajimeInputController: IMKInputController, @unchecked Sendable {
     private var state = CompositionState()
-    private let backend = RuleBasedConversionBackend()
+    private var backend = RuleBasedConversionBackend(dictionary: .withLexicon(UserLexicon.load()))
     private let memoryStore = MemoryStore()
     private let configStore = ConfigStore()
     private lazy var config = configStore.load()
+    private lazy var conversionLogger = ConversionLogger(maxEntries: config.learning.maxLogEntries)
+    private var didScheduleLearningPass = false
     private lazy var idleConversionPolicy = IdleConversionPolicy(
         baseDelay: config.timing.idleBaseDelay,
         fastTypingDelay: config.timing.idleFastTypingDelay,
@@ -55,7 +57,10 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
             return false
         }
 
-        guard CompositionNormalizer.acceptsRomajiCharacter(character) else {
+        let accepted = state.isComposing
+            ? CompositionNormalizer.acceptsComposingCharacter(character)
+            : CompositionNormalizer.acceptsRomajiCharacter(character)
+        guard accepted else {
             return false
         }
 
@@ -194,6 +199,7 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
             if config.timing.kanjiConversionEnabled {
                 kanjiBackend.prewarm()
             }
+            scheduleLearningPassIfNeeded()
         }
         let interval = lastInputAt.map { now.timeIntervalSince($0) }
         lastInputAt = now
@@ -245,6 +251,24 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
     private func cancelIdleConversion() {
         idleTimer?.invalidate()
         idleTimer = nil
+    }
+
+    // At most once a day (stamp-file guarded), mine the opt-in commit log for
+    // recurring English terms and reload the lexicon so fixes apply live.
+    private func scheduleLearningPassIfNeeded() {
+        guard config.learning.enabled, !didScheduleLearningPass else {
+            return
+        }
+        didScheduleLearningPass = true
+        Task.detached(priority: .background) { [weak self] in
+            guard let report = LearningAutoRunner.runIfDue(), !report.addedEnglishTerms.isEmpty else {
+                return
+            }
+            let dictionary = RomajiDictionary.withLexicon(UserLexicon.load())
+            await MainActor.run {
+                self?.backend = RuleBasedConversionBackend(dictionary: dictionary)
+            }
+        }
     }
 
     private var isJumpModeActive: Bool {
@@ -394,6 +418,9 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
     private func commit(_ text: String, client sender: Any!) {
         guard !text.isEmpty else {
             return
+        }
+        if config.learning.enabled {
+            conversionLogger.append(raw: state.buffer, committed: text)
         }
         inputClient(sender)?.insertText(text, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
         state.clear()

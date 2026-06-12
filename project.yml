@@ -30,6 +30,8 @@ targets:
     platform: macOS
     sources:
       - RomajimeCore
+    dependencies:
+      - sdk: FoundationModels.framework
     info:
       path: RomajimeCore/Info.plist
       properties:
@@ -83,6 +85,18 @@ targets:
           - Hira
           - Kana
         TISIntendedLanguage: ja
+  romajime-cli:
+    type: tool
+    platform: macOS
+    # Compiles RomajimeCore sources directly so the binary is standalone
+    # (no framework rpath needed when run from DerivedData).
+    sources:
+      - RomajimeCLI
+      - path: RomajimeCore
+        excludes:
+          - Info.plist
+    dependencies:
+      - sdk: FoundationModels.framework
   RomajimeCoreTests:
     type: bundle.unit-test
     platform: macOS
@@ -101,6 +115,7 @@ schemes:
       targets:
         Romajime: all
         RomajimeInputMethod: all
+        romajime-cli: all
         RomajimeCoreTests: [test]
     test:
       targets:

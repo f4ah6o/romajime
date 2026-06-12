@@ -205,10 +205,48 @@ public struct IdleConversionPolicy: Equatable, Sendable {
 public struct RomajimeConfig: Codable, Equatable, Sendable {
     public var keyBindings: KeyBindings
     public var timing: Timing
+    public var learning: LearningConfig
 
-    public init(keyBindings: KeyBindings = KeyBindings(), timing: Timing = Timing()) {
+    public init(keyBindings: KeyBindings = KeyBindings(), timing: Timing = Timing(), learning: LearningConfig = LearningConfig()) {
         self.keyBindings = keyBindings
         self.timing = timing
+        self.learning = learning
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case keyBindings
+        case timing
+        case learning
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.keyBindings = try values.decodeIfPresent(KeyBindings.self, forKey: .keyBindings) ?? KeyBindings()
+        self.timing = try values.decodeIfPresent(Timing.self, forKey: .timing) ?? Timing()
+        self.learning = try values.decodeIfPresent(LearningConfig.self, forKey: .learning) ?? LearningConfig()
+    }
+}
+
+// Opt-in local learning: nothing is logged unless the user sets
+// {"learning": {"enabled": true}} in config.json.
+public struct LearningConfig: Codable, Equatable, Sendable {
+    public var enabled: Bool
+    public var maxLogEntries: Int
+
+    public init(enabled: Bool = false, maxLogEntries: Int = 20000) {
+        self.enabled = enabled
+        self.maxLogEntries = maxLogEntries
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case enabled
+        case maxLogEntries
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.enabled = try values.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        self.maxLogEntries = try values.decodeIfPresent(Int.self, forKey: .maxLogEntries) ?? 20000
     }
 }
 
@@ -515,14 +553,27 @@ public enum CompositionNormalizer {
     private static let acceptedPunctuation: Set<Character> = [" ", ".", ",", "?", "!", "'", "-", ":", ";", "(", ")", "[", "]", "\""]
 
     public static func normalizeWhitespace(_ input: String) -> String {
-        input.split { $0.isWhitespace }.joined(separator: " ")
+        input.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.split { $0.isWhitespace }.joined(separator: " ") }
+            .joined(separator: "\n")
     }
+
+    // Bufferable only while already composing — never starts a composition,
+    // so a bare "/" or digit outside a draft still reaches the app directly.
+    private static let composingOnlyCharacters: Set<Character> = [
+        "/", "$", "_", "@", "#", "`", "&", "=", "+", "~",
+        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
+    ]
 
     public static func acceptsRomajiCharacter(_ character: Character) -> Bool {
         guard character.unicodeScalars.count == 1, let scalar = character.unicodeScalars.first else {
             return false
         }
         return CharacterSet.letters.contains(scalar) && scalar.isASCII || acceptedPunctuation.contains(character)
+    }
+
+    public static func acceptsComposingCharacter(_ character: Character) -> Bool {
+        acceptsRomajiCharacter(character) || composingOnlyCharacters.contains(character)
     }
 }
 
@@ -553,6 +604,9 @@ public enum CandidateGenerator {
         if !kanaText.isEmpty, trimmed.count > kanaText.count * 3 {
             return candidates
         }
+        if kanaText.contains("\n"), !trimmed.contains("\n") {
+            return candidates
+        }
         let rewritten = MemoryTermRewriter.apply(memory: memory, to: trimmed)
         if rewritten == kanaText {
             return candidates
@@ -577,16 +631,33 @@ public enum MemoryTermRewriter {
 
 public struct RomajiDictionary: Sendable {
     private let table: [String: String]
+    private let extraEnglishTerms: Set<String>
 
     public static let `default` = RomajiDictionary(table: DefaultRomajiTable.values)
 
-    public init(table: [String: String]) {
+    public init(table: [String: String], englishTerms: Set<String> = []) {
         self.table = table
+        self.extraEnglishTerms = Set(englishTerms.map { $0.lowercased() })
     }
+
+    // Built-in table plus the user's learned lexicon: user romaji entries win
+    // over defaults, and learned English terms extend EnglishTermGuard.
+    public static func withLexicon(_ lexicon: UserLexicon) -> RomajiDictionary {
+        RomajiDictionary(
+            table: DefaultRomajiTable.values.merging(lexicon.romajiEntries) { _, user in user },
+            englishTerms: lexicon.englishTerms
+        )
+    }
+
+    // Characters that mark the following run as literal text: slash commands
+    // (/clear), shell variables ($home), identifiers (_name, @user, #tag),
+    // inline code (`kana`), and option-like sequences.
+    private static let literalPrefixes: Set<Character> = ["/", "$", "_", "@", "#", "`", "&", "=", "+", "~"]
 
     public func convert(_ input: String) -> String {
         var output = ""
         var run = ""
+        var runIsLiteral = false
 
         for character in input {
             if isRomajiScalar(character) {
@@ -595,20 +666,28 @@ public struct RomajiDictionary: Sendable {
             }
 
             if !run.isEmpty {
-                output += convertRun(run)
+                output += runIsLiteral ? run : convertRun(run)
                 run.removeAll()
             }
             output.append(character)
+            // A run glued to a preceding letter or digit is the tail of a
+            // mixed word ("Renovate" → "R" + "enovate", "v1up"), not romaji;
+            // a literal prefix (/, $, …) protects the run the same way.
+            runIsLiteral = (character.isASCII && (character.isLetter || character.isNumber))
+                || Self.literalPrefixes.contains(character)
         }
 
         if !run.isEmpty {
-            output += convertRun(run)
+            output += runIsLiteral ? run : convertRun(run)
         }
 
         return output
     }
 
     private func convertRun(_ run: String) -> String {
+        if EnglishTermGuard.isLikelyEnglish(run) || extraEnglishTerms.contains(run.lowercased()) {
+            return run
+        }
         let converted = convertConvertibleRun(run)
         if converted.unicodeScalars.contains(where: { $0.isASCII && CharacterSet.letters.contains($0) }) {
             return run
@@ -681,6 +760,31 @@ public struct RomajiDictionary: Sendable {
     }
 }
 
+// Common English/dev words that also happen to parse as valid romaji
+// (e.g. "fixture" → ふぃっれ, "token" → とけん) stay ASCII. The list is
+// curated: words a Japanese typist plausibly uses AS romaji (made, demo,
+// node, site, kana, mono…) must NOT appear here.
+enum EnglishTermGuard {
+    static func isLikelyEnglish(_ run: String) -> Bool {
+        words.contains(run.lowercased())
+    }
+
+    private static let words: Set<String> = [
+        "abi", "additive", "envelope", "idea", "message", "origin", "rename",
+        "size", "validation",
+        "api", "audio", "base", "baseline", "batch", "branch", "build", "cache",
+        "claude", "client", "code", "codex", "commit", "data", "debug", "deploy",
+        "diff", "docker", "done", "error", "file", "fixture", "freeze", "gemini",
+        "hidden", "hono", "html", "image", "index", "inference", "issue", "json",
+        "linux", "live", "liveview", "macos", "main", "merge", "model", "module",
+        "moonbit", "native", "push", "python", "query", "react", "reason",
+        "rebase", "render", "repo", "resume", "retention", "retry", "route",
+        "rule", "runtime", "rust", "schema", "scope", "server", "shape", "source",
+        "state", "swift", "table", "tauri", "test", "thread", "timeline", "token",
+        "ubuntu", "value", "video", "view", "web"
+    ]
+}
+
 private enum DefaultRomajiTable {
     static let values: [String: String] = [
         "a": "あ", "i": "い", "u": "う", "e": "え", "o": "お",
@@ -706,8 +810,24 @@ private enum DefaultRomajiTable {
         "mya": "みゃ", "myu": "みゅ", "myo": "みょ",
         "rya": "りゃ", "ryu": "りゅ", "ryo": "りょ",
         "gya": "ぎゃ", "gyu": "ぎゅ", "gyo": "ぎょ",
-        "ja": "じゃ", "ju": "じゅ", "jo": "じょ",
+        "ja": "じゃ", "ju": "じゅ", "jo": "じょ", "je": "じぇ",
         "bya": "びゃ", "byu": "びゅ", "byo": "びょ",
-        "pya": "ぴゃ", "pyu": "ぴゅ", "pyo": "ぴょ"
+        "pya": "ぴゃ", "pyu": "ぴゅ", "pyo": "ぴょ",
+        "fa": "ふぁ", "fi": "ふぃ", "fe": "ふぇ", "fo": "ふぉ",
+        "va": "ゔぁ", "vi": "ゔぃ", "vu": "ゔ", "ve": "ゔぇ", "vo": "ゔぉ",
+        "wi": "うぃ", "we": "うぇ",
+        "che": "ちぇ", "she": "しぇ",
+        "dzu": "づ", "dzi": "ぢ",
+        "sya": "しゃ", "syu": "しゅ", "syo": "しょ",
+        "jya": "じゃ", "jyu": "じゅ", "jyo": "じょ",
+        "tya": "ちゃ", "tyu": "ちゅ", "tyo": "ちょ",
+        "tchi": "っち", "tcha": "っちゃ", "tchu": "っちゅ", "tcho": "っちょ",
+        "thi": "てぃ", "dhi": "でぃ", "twu": "とぅ", "dwu": "どぅ",
+        "fyu": "ふゅ", "vyu": "ゔゅ", "wyi": "ゐ", "wye": "ゑ",
+        "xtu": "っ", "ltu": "っ", "xtsu": "っ", "ltsu": "っ",
+        "xa": "ぁ", "xi": "ぃ", "xu": "ぅ", "xe": "ぇ", "xo": "ぉ",
+        "la": "ぁ", "li": "ぃ", "lu": "ぅ", "le": "ぇ", "lo": "ぉ",
+        "xya": "ゃ", "xyu": "ゅ", "xyo": "ょ",
+        "lya": "ゃ", "lyu": "ゅ", "lyo": "ょ"
     ]
 }

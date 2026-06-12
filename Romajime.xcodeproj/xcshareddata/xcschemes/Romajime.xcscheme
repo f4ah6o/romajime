@@ -49,6 +49,20 @@
                ReferencedContainer = "container:Romajime.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8BC44E070C313E3D712B0CD9"
+               BuildableName = "romajime-cli"
+               BlueprintName = "romajime-cli"
+               ReferencedContainer = "container:Romajime.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

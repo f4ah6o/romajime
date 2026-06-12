@@ -147,3 +147,70 @@ todo -> TODO
 ```
 
 秘密情報やモデルレジストリトークンをここに保存しないでください。将来モデル関連の認証情報が必要になった場合は、1Password Developer Environments またはランタイム注入を使います。
+
+## ローカル学習（opt-in）
+
+romajime は、自分の入力を教師データとして変換精度を上げるローカル学習に対応しています。**デフォルトは無効**で、`config.json` で明示的に有効化した場合のみ動きます。
+
+```json
+{
+  "learning": { "enabled": true }
+}
+```
+
+有効にすると次のように動きます。
+
+- 確定のたびに（ローマ字バッファ, 確定テキスト）のペアを `~/Library/Application Support/Romajime/log.jsonl` に記録します。記録は時刻とこの 2 つの文字列だけで、アプリ名・ウィンドウ情報は含めません。ファイルは所有者のみ読み書き可（0600）で、件数上限（既定 20000、`maxLogEntries` で変更可）を超えると古い半分を自動削除します。パスワード欄などのセキュア入力フィールドは macOS が IME 自体を迂回するため、そもそも記録対象になりません。
+- 1 日 1 回、入力開始時にバックグラウンドでログをマイニングします。「ローマ字として解釈できてしまうが、本人は常に ASCII のまま確定している単語」（例: `fixture` → ふぃっれ になってしまう問題）を 2 回以上の出現で検出し、`english_terms.txt` に追記します。学習結果は即座に変換へ反映されます。
+- 学習の成果物はすべて人間が読めるテキストファイルです。行を消せばその学習は取り消され、`log.jsonl` を消せば履歴ごと消えます。ネットワーク送信は一切ありません。
+
+手動で学習パスを回す・確認するには CLI を使います。
+
+```bash
+just learn --dry-run   # 何が学習されるかの確認のみ
+just learn             # english_terms.txt に反映
+```
+
+学習の主経路は、確定ログよりもプロンプト履歴のローマ字化コーパスです（romajime には候補選択の概念がないため、確定結果だけでは教師信号が弱い）。`just eval-collect` で作ったコーパスをそのまま学習に流せます。
+
+```bash
+just learn --corpus eval/corpus.tsv --dry-run   # 履歴から学習される語を確認
+just learn --corpus eval/corpus.tsv             # english_terms.txt に反映
+```
+
+学習で増えるファイル:
+
+```text
+~/Library/Application Support/Romajime/
+  log.jsonl           # 確定ログ（opt-in 時のみ・0600）
+  english_terms.txt   # ASCII のまま保持する学習済み英単語（1 行 1 語）
+  user_romaji.tsv     # ユーザー定義のローマ字→かな（romaji<TAB>かな）
+  last_learn          # 自動学習の最終実行時刻
+```
+
+`english_terms.txt` と `user_romaji.tsv` は手で編集しても構いません。エンジンの組み込み辞書より優先されます。
+
+## 変換エンジン CLI と評価ループ
+
+変換エンジンは入力メソッドを介さず CLI から直接試せます。
+
+```bash
+just convert "kyou ha kaigi"                 # 漢字変換（Foundation Models）
+printf 'kyou ha kaigi\nashita' | \
+  DerivedData/Build/Products/Debug/romajime-cli --kana-only   # かな変換のみ・改行保持
+romajime-cli --reverse "今日は会議"            # 逆変換: 日本語 → 打鍵ローマ字
+```
+
+Claude Code / Codex のプロンプト履歴から自分の文体のテストコーパスを作り、精度を測る評価ループも用意しています（生成物はすべて gitignore 済み）。
+
+```bash
+just eval-collect   # 履歴からコーパス生成（ローカルのみ）
+just eval           # かな精度の計測（eval/history.jsonl に推移を記録）
+just eval-kanji 30  # LLM 漢字変換込みの計測（30 件サンプル）
+```
+
+コーパス源は Claude Code（`~/.claude/projects`）と Codex（`~/.codex/history.jsonl`）に加えて、ChatGPT や claude.ai のデータエクスポート（`conversations.json` など）を `eval/sources/` に置けば自動検出されます。`eval/` 配下の私的データはすべて gitignore 済みです。
+
+## 無変換にしたい文字
+
+`/clear` のようなスラッシュコマンド、`$home` のような変数、`` `kana` `` のようなインラインコード、`_name`・`@user`・`#tag` は、プレフィックス（`/ $ _ @ # ` & = + ~`）に続く英字列を変換せずそのまま保持します。これらの文字と数字は変換中バッファに追加できますが、変換中でないときは IME を素通りしてアプリに直接届きます（`/` 単独でチャットのコマンド入力を妨げません）。

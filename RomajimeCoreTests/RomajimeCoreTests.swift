@@ -40,8 +40,168 @@ final class RomajimeCoreTests: XCTestCase {
         XCTAssertTrue(state.candidates.isEmpty)
     }
 
-    func testWhitespaceNormalization() {
-        XCTAssertEqual(CompositionNormalizer.normalizeWhitespace("  kyou   mtg\tde\nhanasita todo  "), "kyou mtg de hanasita todo")
+    func testWhitespaceNormalizationPreservesNewlines() {
+        XCTAssertEqual(CompositionNormalizer.normalizeWhitespace("  kyou   mtg\tde\nhanasita todo  "), "kyou mtg de\nhanasita todo")
+        XCTAssertEqual(CompositionNormalizer.normalizeWhitespace("a\n\nb"), "a\n\nb")
+    }
+
+    func testConversionPreservesNewlines() throws {
+        let backend = RuleBasedConversionBackend()
+        let result = try backend.convert(.init(raw: "kyou ha kaigi\nashita ha yasumi"))
+        XCTAssertEqual(result.candidates.first?.text, "きょう は かいぎ\nあした は やすみ")
+    }
+
+    func testReverseTransliteratorProducesTypedRomaji() {
+        XCTAssertEqual(ReverseTransliterator.romaji("今日は会議"), "kyou ha kaigi")
+        XCTAssertEqual(ReverseTransliterator.kana("今日は会議"), "きょう は かいぎ")
+    }
+
+    func testReverseTransliteratorPreservesNewlinesAndAscii() {
+        let romaji = ReverseTransliterator.romaji("変換を改善\nTODO を確認")
+        XCTAssertEqual(romaji, "henkan wo kaizen\nTODO wo kakunin")
+    }
+
+    func testReverseTransliteratorNormalizesMacrons() {
+        XCTAssertFalse(ReverseTransliterator.romaji("改善ループ").contains("ū"))
+    }
+
+    func testReverseTransliteratorMergesGeminates() {
+        // CFStringTokenizer reads なった as "na~tsu"+"ta"; a typist writes "natta".
+        XCTAssertEqual(ReverseTransliterator.romaji("なったらしい"), "natta rashii")
+        XCTAssertEqual(ReverseTransliterator.kana("なったらしい"), "なった らしい")
+    }
+
+    func testExtendedKatakanaRomaji() throws {
+        let backend = RuleBasedConversionBackend()
+        let result = try backend.convert(.init(raw: "fairu wo chekku shite itchi wo kakunin"))
+        XCTAssertEqual(result.candidates.first?.text, "ふぁいる を ちぇっく して いっち を かくにん")
+    }
+
+    func testSmallTsuFallbackEntries() throws {
+        let backend = RuleBasedConversionBackend()
+        let result = try backend.convert(.init(raw: "axtu sorejya xyaxyuxyo"))
+        XCTAssertEqual(result.candidates.first?.text, "あっ それじゃ ゃゅょ")
+    }
+
+    func testEnglishTermsStayAscii() throws {
+        let backend = RuleBasedConversionBackend()
+        let result = try backend.convert(.init(raw: "fixture wo runtime de token to issue ni tsuika"))
+        XCTAssertEqual(result.candidates.first?.text, "fixture を runtime で token と issue に ついか")
+    }
+
+    func testRomajiCollidingWithEnglishStillConverts() throws {
+        // made/demo/node read as English but are far more common as romaji.
+        let backend = RuleBasedConversionBackend()
+        let result = try backend.convert(.init(raw: "asa made demo node sore"))
+        XCTAssertEqual(result.candidates.first?.text, "あさ まで でも ので それ")
+    }
+
+    func testLiteralPrefixesProtectRuns() throws {
+        let backend = RuleBasedConversionBackend()
+        let result = try backend.convert(.init(raw: "/sukina komando to $home hensuu wo sonomama"))
+        XCTAssertEqual(result.candidates.first?.text, "/sukina こまんど と $home へんすう を そのまま")
+        let inlineCode = try backend.convert(.init(raw: "kore ha `kana` to _kana desu"))
+        XCTAssertEqual(inlineCode.candidates.first?.text, "これ は `kana` と _kana です")
+    }
+
+    func testComposingOnlyCharactersNeverStartComposition() {
+        for character in ["/", "$", "3"].compactMap(\.first) {
+            XCTAssertFalse(CompositionNormalizer.acceptsRomajiCharacter(character))
+            XCTAssertTrue(CompositionNormalizer.acceptsComposingCharacter(character))
+        }
+        XCTAssertTrue(CompositionNormalizer.acceptsComposingCharacter("a"))
+    }
+
+    func testMixedCaseWordTailStaysAscii() throws {
+        let backend = RuleBasedConversionBackend()
+        let result = try backend.convert(.init(raw: "Renovate ga yoi"))
+        XCTAssertEqual(result.candidates.first?.text, "Renovate が よい")
+    }
+
+    private func makeTempDirectory() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RomajimeTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: url)
+        }
+        return url
+    }
+
+    func testUserLexiconLoadsTermsAndEntries() throws {
+        let dir = try makeTempDirectory()
+        try "# comment\nkibana\nVite\n".write(to: dir.appendingPathComponent(UserLexicon.englishTermsFile), atomically: true, encoding: .utf8)
+        try "# comment\nwyi\tうぃ\n".write(to: dir.appendingPathComponent(UserLexicon.romajiEntriesFile), atomically: true, encoding: .utf8)
+        let lexicon = UserLexicon.load(from: dir)
+        XCTAssertEqual(lexicon.englishTerms, ["kibana", "vite"])
+        XCTAssertEqual(lexicon.romajiEntries, ["wyi": "うぃ"])
+
+        let backend = RuleBasedConversionBackend(dictionary: .withLexicon(lexicon))
+        let result = try backend.convert(.init(raw: "kibana de kakunin"))
+        XCTAssertEqual(result.candidates.first?.text, "kibana で かくにん")
+    }
+
+    func testConversionLoggerAppendsTrimsAndProtects() throws {
+        let dir = try makeTempDirectory()
+        let logger = ConversionLogger(directory: dir, maxEntries: 4)
+        for index in 0..<6 {
+            logger.append(raw: "raw\(index)", committed: "確定\(index)")
+        }
+        let entries = ConversionLogger.readEntries(from: dir)
+        // 5th append exceeds maxEntries(4) and trims to the newest 2; the 6th appends on top.
+        XCTAssertEqual(entries.count, 3)
+        XCTAssertEqual(entries.map(\.raw), ["raw3", "raw4", "raw5"])
+        let attributes = try FileManager.default.attributesOfItem(atPath: dir.appendingPathComponent(ConversionLogger.logFile).path)
+        XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
+    }
+
+    func testLearningMinerLearnsEnglishTermsButRespectsBlocklist() throws {
+        let dir = try makeTempDirectory()
+        let logger = ConversionLogger(directory: dir)
+        // "kibana" parses as romaji (きばな) but the user keeps it ASCII.
+        logger.append(raw: "kibana de mita", committed: "kibana で 見た")
+        logger.append(raw: "kibana wo hiraku", committed: "kibana を 開く")
+        // "made" appears verbatim too, but is blocklisted (まで).
+        logger.append(raw: "asa made matsu", committed: "朝 made 待つ")
+        logger.append(raw: "yoru made matsu", committed: "夜 made 待つ")
+        // Raw-fallback commits (no conversion happened) must be ignored entirely.
+        logger.append(raw: "henkan sippai reigai", committed: "henkan sippai reigai")
+        logger.append(raw: "henkan sippai reigai", committed: "henkan sippai reigai")
+
+        let report = LearningMiner.runLearningPass(directory: dir)
+        XCTAssertEqual(report.addedEnglishTerms, ["kibana"])
+
+        let lexicon = UserLexicon.load(from: dir)
+        XCTAssertTrue(lexicon.englishTerms.contains("kibana"))
+        XCTAssertFalse(lexicon.englishTerms.contains("made"))
+
+        // Second pass: kibana is now protected, so nothing new is learned.
+        let second = LearningMiner.runLearningPass(directory: dir)
+        XCTAssertEqual(second.addedEnglishTerms, [])
+    }
+
+    func testLearningAutoRunnerHonorsInterval() throws {
+        let dir = try makeTempDirectory()
+        XCTAssertNotNil(LearningAutoRunner.runIfDue(directory: dir, interval: 3600))
+        XCTAssertNil(LearningAutoRunner.runIfDue(directory: dir, interval: 3600))
+        XCTAssertNotNil(LearningAutoRunner.runIfDue(directory: dir, interval: 3600, now: Date().addingTimeInterval(7200)))
+    }
+
+    func testLearningConfigDefaultsToOptOut() throws {
+        XCTAssertFalse(RomajimeConfig().learning.enabled)
+        let decoded = try JSONDecoder().decode(RomajimeConfig.self, from: Data("{}".utf8))
+        XCTAssertFalse(decoded.learning.enabled)
+        let enabled = try JSONDecoder().decode(RomajimeConfig.self, from: Data(#"{"learning":{"enabled":true}}"#.utf8))
+        XCTAssertTrue(enabled.learning.enabled)
+    }
+
+    func testMergingKanjiRejectsCandidateThatDropsNewlines() {
+        let candidates = [ConversionCandidate(id: "kana", text: "きょう は かいぎ\nあした は やすみ", label: "Kana", confidence: 0.7)]
+        let merged = CandidateGenerator.mergingKanji("今日は会議 明日は休み", into: candidates)
+        XCTAssertEqual(merged.first?.id, "kana")
+        let preserved = CandidateGenerator.mergingKanji("今日は会議\n明日は休み", into: candidates)
+        XCTAssertEqual(preserved.first?.id, "kanji")
+        XCTAssertEqual(preserved.first?.text, "今日は会議\n明日は休み")
     }
 
     func testIdleConversionPolicyExtendsDelayWhileTypingFast() {
