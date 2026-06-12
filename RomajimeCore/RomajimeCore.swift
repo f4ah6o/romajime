@@ -72,11 +72,21 @@ public struct IdleConversionPolicy: Equatable, Sendable {
     public var baseDelay: TimeInterval
     public var fastTypingDelay: TimeInterval
     public var fastTypingThreshold: TimeInterval
+    public var sentenceBoundaryDelay: TimeInterval
+    public var maxComposingDelay: TimeInterval
 
-    public init(baseDelay: TimeInterval = 1.2, fastTypingDelay: TimeInterval = 1.8, fastTypingThreshold: TimeInterval = 0.18) {
+    public init(
+        baseDelay: TimeInterval = 1.2,
+        fastTypingDelay: TimeInterval = 1.8,
+        fastTypingThreshold: TimeInterval = 0.18,
+        sentenceBoundaryDelay: TimeInterval = 0.45,
+        maxComposingDelay: TimeInterval = 8.0
+    ) {
         self.baseDelay = baseDelay
         self.fastTypingDelay = fastTypingDelay
         self.fastTypingThreshold = fastTypingThreshold
+        self.sentenceBoundaryDelay = sentenceBoundaryDelay
+        self.maxComposingDelay = maxComposingDelay
     }
 
     public func delay(afterKeystrokeInterval interval: TimeInterval?) -> TimeInterval {
@@ -84,6 +94,57 @@ public struct IdleConversionPolicy: Equatable, Sendable {
             return baseDelay
         }
         return interval < fastTypingThreshold ? fastTypingDelay : baseDelay
+    }
+
+    public func delay(for buffer: String, afterKeystrokeInterval interval: TimeInterval?) -> TimeInterval {
+        let trimmed = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return baseDelay
+        }
+        if isSentenceBoundary(buffer: buffer, trimmed: trimmed) {
+            return sentenceBoundaryDelay
+        }
+        return delay(afterKeystrokeInterval: interval)
+    }
+
+    public func shouldConvert(buffer: String, elapsed: TimeInterval?) -> Bool {
+        let trimmed = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return false
+        }
+        if let elapsed, elapsed >= maxComposingDelay {
+            return true
+        }
+        if isProbablyIncompleteRomaji(trimmed) {
+            return false
+        }
+        if isSentenceBoundary(buffer: buffer, trimmed: trimmed) {
+            return true
+        }
+        return trimmed.count >= 80
+    }
+
+    public func shouldAskIntelligence(buffer: String, elapsed: TimeInterval?) -> Bool {
+        let trimmed = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !shouldConvert(buffer: buffer, elapsed: elapsed) else {
+            return false
+        }
+        return trimmed.count >= 24 && !isProbablyIncompleteRomaji(trimmed)
+    }
+
+    private func isSentenceBoundary(buffer: String, trimmed: String) -> Bool {
+        guard let last = trimmed.last else {
+            return false
+        }
+        return ".。!?！？".contains(last) || buffer.hasSuffix("\n")
+    }
+
+    private func isProbablyIncompleteRomaji(_ text: String) -> Bool {
+        let tail = text.split { $0.isWhitespace }.last.map(String.init) ?? text
+        guard let last = tail.last?.lowercased().first else {
+            return false
+        }
+        return tail.count <= 3 && "bcdfghjklmnpqrstvwxyz".contains(last)
     }
 }
 
@@ -99,6 +160,7 @@ public struct RomajimeConfig: Codable, Equatable, Sendable {
 
 public struct KeyBindings: Codable, Equatable, Sendable {
     public var bufferSpace: KeyStroke
+    public var newlineCommit: [KeyStroke]
     public var ignoredCommit: [KeyStroke]
     public var deleteBackward: KeyStroke
     public var convertOrJump: KeyStroke
@@ -107,18 +169,47 @@ public struct KeyBindings: Codable, Equatable, Sendable {
 
     public init(
         bufferSpace: KeyStroke = KeyStroke(keyCode: 49),
-        ignoredCommit: [KeyStroke] = [KeyStroke(keyCode: 36), KeyStroke(keyCode: 76)],
+        newlineCommit: [KeyStroke] = [KeyStroke(keyCode: 36), KeyStroke(keyCode: 76)],
+        ignoredCommit: [KeyStroke] = [],
         deleteBackward: KeyStroke = KeyStroke(keyCode: 51),
         convertOrJump: KeyStroke = KeyStroke(keyCode: 53),
         jumpConfirm: KeyStroke = KeyStroke(keyCode: 49),
         jumpCancel: KeyStroke = KeyStroke(keyCode: 53)
     ) {
         self.bufferSpace = bufferSpace
+        self.newlineCommit = newlineCommit
         self.ignoredCommit = ignoredCommit
         self.deleteBackward = deleteBackward
         self.convertOrJump = convertOrJump
         self.jumpConfirm = jumpConfirm
         self.jumpCancel = jumpCancel
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case bufferSpace
+        case newlineCommit
+        case ignoredCommit
+        case deleteBackward
+        case convertOrJump
+        case jumpConfirm
+        case jumpCancel
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.bufferSpace = try values.decodeIfPresent(KeyStroke.self, forKey: .bufferSpace) ?? KeyStroke(keyCode: 49)
+        if let newlineCommit = try values.decodeIfPresent([KeyStroke].self, forKey: .newlineCommit) {
+            self.newlineCommit = newlineCommit
+        } else if values.contains(.ignoredCommit) {
+            self.newlineCommit = []
+        } else {
+            self.newlineCommit = [KeyStroke(keyCode: 36), KeyStroke(keyCode: 76)]
+        }
+        self.ignoredCommit = try values.decodeIfPresent([KeyStroke].self, forKey: .ignoredCommit) ?? []
+        self.deleteBackward = try values.decodeIfPresent(KeyStroke.self, forKey: .deleteBackward) ?? KeyStroke(keyCode: 51)
+        self.convertOrJump = try values.decodeIfPresent(KeyStroke.self, forKey: .convertOrJump) ?? KeyStroke(keyCode: 53)
+        self.jumpConfirm = try values.decodeIfPresent(KeyStroke.self, forKey: .jumpConfirm) ?? KeyStroke(keyCode: 49)
+        self.jumpCancel = try values.decodeIfPresent(KeyStroke.self, forKey: .jumpCancel) ?? KeyStroke(keyCode: 53)
     }
 }
 
@@ -136,18 +227,53 @@ public struct Timing: Codable, Equatable, Sendable {
     public var idleBaseDelay: TimeInterval
     public var idleFastTypingDelay: TimeInterval
     public var idleFastTypingThreshold: TimeInterval
+    public var idleSentenceBoundaryDelay: TimeInterval
+    public var maxComposingDelay: TimeInterval
+    public var localIntelligenceEnabled: Bool
+    public var localIntelligenceTimeout: TimeInterval
     public var jumpModeTimeout: TimeInterval
 
     public init(
         idleBaseDelay: TimeInterval = 1.2,
         idleFastTypingDelay: TimeInterval = 1.8,
         idleFastTypingThreshold: TimeInterval = 0.18,
+        idleSentenceBoundaryDelay: TimeInterval = 0.45,
+        maxComposingDelay: TimeInterval = 8.0,
+        localIntelligenceEnabled: Bool = true,
+        localIntelligenceTimeout: TimeInterval = 0.3,
         jumpModeTimeout: TimeInterval = 3.0
     ) {
         self.idleBaseDelay = idleBaseDelay
         self.idleFastTypingDelay = idleFastTypingDelay
         self.idleFastTypingThreshold = idleFastTypingThreshold
+        self.idleSentenceBoundaryDelay = idleSentenceBoundaryDelay
+        self.maxComposingDelay = maxComposingDelay
+        self.localIntelligenceEnabled = localIntelligenceEnabled
+        self.localIntelligenceTimeout = localIntelligenceTimeout
         self.jumpModeTimeout = jumpModeTimeout
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case idleBaseDelay
+        case idleFastTypingDelay
+        case idleFastTypingThreshold
+        case idleSentenceBoundaryDelay
+        case maxComposingDelay
+        case localIntelligenceEnabled
+        case localIntelligenceTimeout
+        case jumpModeTimeout
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.idleBaseDelay = try values.decodeIfPresent(TimeInterval.self, forKey: .idleBaseDelay) ?? 1.2
+        self.idleFastTypingDelay = try values.decodeIfPresent(TimeInterval.self, forKey: .idleFastTypingDelay) ?? 1.8
+        self.idleFastTypingThreshold = try values.decodeIfPresent(TimeInterval.self, forKey: .idleFastTypingThreshold) ?? 0.18
+        self.idleSentenceBoundaryDelay = try values.decodeIfPresent(TimeInterval.self, forKey: .idleSentenceBoundaryDelay) ?? 0.45
+        self.maxComposingDelay = try values.decodeIfPresent(TimeInterval.self, forKey: .maxComposingDelay) ?? 8.0
+        self.localIntelligenceEnabled = try values.decodeIfPresent(Bool.self, forKey: .localIntelligenceEnabled) ?? true
+        self.localIntelligenceTimeout = try values.decodeIfPresent(TimeInterval.self, forKey: .localIntelligenceTimeout) ?? 0.3
+        self.jumpModeTimeout = try values.decodeIfPresent(TimeInterval.self, forKey: .jumpModeTimeout) ?? 3.0
     }
 }
 

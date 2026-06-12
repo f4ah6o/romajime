@@ -2,7 +2,7 @@ name: Romajime
 options:
   bundleIdPrefix: com.f12o
   deploymentTarget:
-    macOS: "14.0"
+    macOS: "26.0"
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -41,6 +41,7 @@ targets:
       - RomajimeInputMethod
     dependencies:
       - sdk: InputMethodKit.framework
+      - sdk: FoundationModels.framework
       - target: RomajimeCore
         embed: true
     settings:

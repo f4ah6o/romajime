@@ -51,6 +51,15 @@ final class RomajimeCoreTests: XCTestCase {
         XCTAssertEqual(policy.delay(afterKeystrokeInterval: 0.08), 1.8)
     }
 
+    func testIdleConversionPolicyUsesSentenceBoundaryDelay() {
+        let policy = IdleConversionPolicy(baseDelay: 1.2, sentenceBoundaryDelay: 0.45)
+        XCTAssertEqual(policy.delay(for: "koreha yameru.", afterKeystrokeInterval: 0.4), 0.45)
+        XCTAssertEqual(policy.delay(for: "koreha yameru\n", afterKeystrokeInterval: 0.4), 0.45)
+        XCTAssertTrue(policy.shouldConvert(buffer: "koreha yameru.", elapsed: 1.0))
+        XCTAssertFalse(policy.shouldConvert(buffer: "k", elapsed: 1.0))
+        XCTAssertTrue(policy.shouldConvert(buffer: "koreha mada kaiteiru", elapsed: 9.0))
+    }
+
     func testJumpLabelsContinueFromZToAA() {
         XCTAssertEqual(JumpLabelGenerator.label(for: 0), "a")
         XCTAssertEqual(JumpLabelGenerator.label(for: 25), "z")
@@ -69,11 +78,38 @@ final class RomajimeCoreTests: XCTestCase {
         let data = try JSONEncoder().encode(config)
         let decoded = try JSONDecoder().decode(RomajimeConfig.self, from: data)
         XCTAssertEqual(decoded.keyBindings.bufferSpace, KeyStroke(keyCode: 49))
-        XCTAssertEqual(decoded.keyBindings.ignoredCommit, [KeyStroke(keyCode: 36), KeyStroke(keyCode: 76)])
+        XCTAssertEqual(decoded.keyBindings.newlineCommit, [KeyStroke(keyCode: 36), KeyStroke(keyCode: 76)])
+        XCTAssertEqual(decoded.keyBindings.ignoredCommit, [])
         XCTAssertEqual(decoded.keyBindings.deleteBackward, KeyStroke(keyCode: 51))
         XCTAssertEqual(decoded.keyBindings.convertOrJump, KeyStroke(keyCode: 53))
         XCTAssertEqual(decoded.keyBindings.jumpConfirm, KeyStroke(keyCode: 49))
         XCTAssertEqual(decoded.keyBindings.jumpCancel, KeyStroke(keyCode: 53))
+    }
+
+    func testConfigDecodesLegacyKeyBindings() throws {
+        let data = """
+        {
+          "keyBindings": {
+            "bufferSpace": { "keyCode": 49 },
+            "ignoredCommit": [{ "keyCode": 36 }, { "keyCode": 76 }],
+            "deleteBackward": { "keyCode": 51 },
+            "convertOrJump": { "keyCode": 53 },
+            "jumpConfirm": { "keyCode": 49 },
+            "jumpCancel": { "keyCode": 53 }
+          },
+          "timing": {
+            "idleBaseDelay": 1.2,
+            "idleFastTypingDelay": 1.8,
+            "idleFastTypingThreshold": 0.18,
+            "jumpModeTimeout": 3.0
+          }
+        }
+        """.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(RomajimeConfig.self, from: data)
+        XCTAssertEqual(decoded.keyBindings.newlineCommit, [])
+        XCTAssertEqual(decoded.keyBindings.ignoredCommit, [KeyStroke(keyCode: 36), KeyStroke(keyCode: 76)])
+        XCTAssertEqual(decoded.timing.idleSentenceBoundaryDelay, 0.45)
+        XCTAssertTrue(decoded.timing.localIntelligenceEnabled)
     }
 
     func testTextUnitScannerUsesPhraseBoundariesNotWhitespace() {

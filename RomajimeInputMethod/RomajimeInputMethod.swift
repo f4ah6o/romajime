@@ -1,4 +1,5 @@
 import AppKit
+import FoundationModels
 import InputMethodKit
 import RomajimeCore
 
@@ -11,7 +12,7 @@ final class InputMethodApplicationDelegate: NSObject, NSApplicationDelegate {
 }
 
 @objc(RomajimeInputController)
-public final class RomajimeInputController: IMKInputController {
+public final class RomajimeInputController: IMKInputController, @unchecked Sendable {
     private var state = CompositionState()
     private let backend = RuleBasedConversionBackend()
     private let memoryStore = MemoryStore()
@@ -20,10 +21,15 @@ public final class RomajimeInputController: IMKInputController {
     private lazy var idleConversionPolicy = IdleConversionPolicy(
         baseDelay: config.timing.idleBaseDelay,
         fastTypingDelay: config.timing.idleFastTypingDelay,
-        fastTypingThreshold: config.timing.idleFastTypingThreshold
+        fastTypingThreshold: config.timing.idleFastTypingThreshold,
+        sentenceBoundaryDelay: config.timing.idleSentenceBoundaryDelay,
+        maxComposingDelay: config.timing.maxComposingDelay
     )
     private var idleTimer: Timer?
     private var lastInputAt: Date?
+    private var compositionStartedAt: Date?
+    private var readinessRequestID = 0
+    private var readinessClient: Any?
     private var jumpTargets: [JumpTarget] = []
     private var jumpLabelBuffer = ""
     private var jumpModeTimer: Timer?
@@ -69,6 +75,16 @@ public final class RomajimeInputController: IMKInputController {
                 return false
             }
             state.append(" ")
+            updateMarkedText(client: sender)
+            scheduleIdleConversion(client: sender)
+            return true
+        }
+
+        if config.keyBindings.newlineCommit.contains(where: event.matches(_:)) {
+            guard state.isComposing else {
+                return false
+            }
+            state.append("\n")
             updateMarkedText(client: sender)
             scheduleIdleConversion(client: sender)
             return true
@@ -122,9 +138,12 @@ public final class RomajimeInputController: IMKInputController {
         }
 
         let now = Date()
+        if compositionStartedAt == nil {
+            compositionStartedAt = now
+        }
         let interval = lastInputAt.map { now.timeIntervalSince($0) }
         lastInputAt = now
-        let delay = idleConversionPolicy.delay(afterKeystrokeInterval: interval)
+        let delay = idleConversionPolicy.delay(for: state.buffer, afterKeystrokeInterval: interval)
         let client = sender as AnyObject
         idleTimer = Timer.scheduledTimer(timeInterval: delay, target: self, selector: #selector(idleTimerFired(_:)), userInfo: client, repeats: false)
     }
@@ -133,7 +152,40 @@ public final class RomajimeInputController: IMKInputController {
         guard let client = timer.userInfo else {
             return
         }
-        convertAndCommit(client: client)
+        let buffer = state.buffer
+        let elapsed = compositionStartedAt.map { Date().timeIntervalSince($0) }
+        if idleConversionPolicy.shouldConvert(buffer: buffer, elapsed: elapsed) {
+            convertAndCommit(client: client)
+            return
+        }
+
+        guard config.timing.localIntelligenceEnabled, idleConversionPolicy.shouldAskIntelligence(buffer: buffer, elapsed: elapsed) else {
+            scheduleIdleConversion(client: client)
+            return
+        }
+
+        readinessRequestID += 1
+        let requestID = readinessRequestID
+        readinessClient = client
+        let timeout = config.timing.localIntelligenceTimeout
+        Task { [weak self] in
+            let shouldConvert = await LocalIntelligenceReadinessAdvisor.shouldConvert(buffer: buffer, timeout: timeout)
+            await MainActor.run {
+                self?.finishIntelligenceReadiness(requestID: requestID, buffer: buffer, shouldConvert: shouldConvert)
+            }
+        }
+    }
+
+    private func finishIntelligenceReadiness(requestID: Int, buffer: String, shouldConvert: Bool) {
+        guard readinessRequestID == requestID, state.buffer == buffer, let client = readinessClient else {
+            return
+        }
+        readinessClient = nil
+        if shouldConvert {
+            convertAndCommit(client: client)
+        } else {
+            scheduleIdleConversion(client: client)
+        }
     }
 
     private func cancelIdleConversion() {
@@ -273,6 +325,51 @@ public final class RomajimeInputController: IMKInputController {
         inputClient(sender)?.insertText(text, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
         state.clear()
         lastInputAt = nil
+        compositionStartedAt = nil
+        readinessRequestID += 1
+        readinessClient = nil
+    }
+}
+
+private enum LocalIntelligenceReadinessAdvisor {
+    static func shouldConvert(buffer: String, timeout: TimeInterval) async -> Bool {
+        guard #available(macOS 26.0, *) else {
+            return false
+        }
+        return await withTaskGroup(of: Bool.self, returning: Bool.self) { group in
+            group.addTask {
+                await askFoundationModel(buffer: buffer)
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                return false
+            }
+            let result = await group.next() ?? false
+            group.cancelAll()
+            return result
+        }
+    }
+
+    @available(macOS 26.0, *)
+    private static func askFoundationModel(buffer: String) async -> Bool {
+        let model = SystemLanguageModel.default
+        guard case .available = model.availability else {
+            return false
+        }
+        let session = LanguageModelSession(model: model)
+        let prompt = """
+        You decide whether a romaji draft should be converted to Japanese now.
+        Answer exactly CONVERT or WAIT.
+        CONVERT when the thought looks complete enough to review in Japanese.
+        WAIT when the user is likely still in the middle of a word or phrase.
+
+        Draft:
+        \(buffer)
+        """
+        guard let response = try? await session.respond(to: prompt) else {
+            return false
+        }
+        return response.content.uppercased().contains("CONVERT")
     }
 }
 

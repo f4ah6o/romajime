@@ -10,8 +10,9 @@ Phase 1 is implemented:
 - Keep spaces in the composition buffer for long-form romaji drafts.
 - Do not do IME-style conversion or candidate cycling while typing.
 - Convert and commit the whole buffered draft automatically after typing pauses.
-- Ignore Enter while composing, so chat-style Send shortcuts do not become an
-  accidental raw commit path.
+- Keep Return and keypad Enter as newlines in the composition buffer by default.
+- Enter can still be configured as ignored, so chat-style Send shortcuts do not
+  become an accidental raw commit path.
 - Convert and commit immediately with Escape while composing.
 - Start phrase jump mode with Escape while not composing. Jump labels accept
   alphabetic labels or numeric aliases in reading order; type the label, then
@@ -49,7 +50,8 @@ keys are not configurable; only non-input control keys and timings are.
 {
   "keyBindings": {
     "bufferSpace": { "keyCode": 49 },
-    "ignoredCommit": [{ "keyCode": 36 }, { "keyCode": 76 }],
+    "newlineCommit": [{ "keyCode": 36 }, { "keyCode": 76 }],
+    "ignoredCommit": [],
     "deleteBackward": { "keyCode": 51 },
     "convertOrJump": { "keyCode": 53 },
     "jumpConfirm": { "keyCode": 49 },
@@ -59,6 +61,10 @@ keys are not configurable; only non-input control keys and timings are.
     "idleBaseDelay": 1.2,
     "idleFastTypingDelay": 1.8,
     "idleFastTypingThreshold": 0.18,
+    "idleSentenceBoundaryDelay": 0.45,
+    "maxComposingDelay": 8.0,
+    "localIntelligenceEnabled": true,
+    "localIntelligenceTimeout": 0.3,
     "jumpModeTimeout": 3.0
   }
 }
@@ -68,10 +74,14 @@ Default key codes are: Space `49`, Return `36`, keypad Enter `76`, Delete `51`,
 Escape `53`. Add `"requiredModifiers"` when a binding should only match an
 exact modifier mask.
 
+To restore the old Enter behavior, set `"newlineCommit": []` and
+`"ignoredCommit": [{ "keyCode": 36 }, { "keyCode": 76 }]`.
+
 ## Build and Install (Recommended: Using Justfile)
 
 ### Prerequisites
 
+- macOS 26 SDK or later.
 - `xcodegen` (`brew install xcodegen`) and `just` (`brew install just`)
 - An **Apple Development** signing certificate. Free Apple ID is enough:
   Xcode → Settings → Accounts → add Apple ID → Manage Certificates → '+' → Apple Development.

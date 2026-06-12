@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		03737C29E73DED7C49FCC726 /* RomajimeInputMethod.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B15C79D6566D7F78751A907 /* RomajimeInputMethod.swift */; };
+		248B64AA6552B54D6D21914C /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B30BE58B7F286BC9A908AE42 /* FoundationModels.framework */; };
 		2733A5B8AF4A15E017D5C4C0 /* InputMethodKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 61D6783C85D69D747CF80C98 /* InputMethodKit.framework */; };
 		2A0B7C75A1BA66548D606ABB /* RomajimeCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F4510F15B4947A611C5353E /* RomajimeCore.swift */; };
 		339E0FD17E216A7FC53F990C /* RomajimeCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FF422929657525E07DC88766 /* RomajimeCore.framework */; };
@@ -93,6 +94,7 @@
 		7DD3C05FB5E302AE39173DFC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8C2C3A09D0703B90051F4622 /* RomajimeInputMethod.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RomajimeInputMethod.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B16026A92A4124EFE440F65F /* Romajime.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Romajime.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B30BE58B7F286BC9A908AE42 /* FoundationModels.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FoundationModels.framework; path = System/Library/Frameworks/FoundationModels.framework; sourceTree = SDKROOT; };
 		E5659431F442521A694C5CF1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FBDFAFA80ABAE735F3FBA427 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FF422929657525E07DC88766 /* RomajimeCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = RomajimeCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -120,6 +122,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2733A5B8AF4A15E017D5C4C0 /* InputMethodKit.framework in Frameworks */,
+				248B64AA6552B54D6D21914C /* FoundationModels.framework in Frameworks */,
 				B75992D03C08C0D784DB2C79 /* RomajimeCore.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -141,6 +144,7 @@
 		22CEED9589DA6AC84C3A4E13 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				B30BE58B7F286BC9A908AE42 /* FoundationModels.framework */,
 				61D6783C85D69D747CF80C98 /* InputMethodKit.framework */,
 			);
 			name = Frameworks;
@@ -468,7 +472,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -545,7 +549,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

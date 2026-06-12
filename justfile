@@ -117,7 +117,7 @@ LSREGISTER := "/System/Library/Frameworks/CoreServices.framework/Frameworks/Laun
     @echo "     ─────────────────────────────────────"
     @echo "     ka [pause]           → か"
     @echo "     koreha yameru [pause] → これは やめる"
-    @echo "     (Enter while typing) → ignored"
+    @echo "     (Enter while typing) → newline kept in buffer"
     @echo "     (Escape while typing) → convert immediately"
     @echo "     (Escape while idle)  → enter jump mode"
     @echo "     a b ... + Space      → jump to labeled phrase"
