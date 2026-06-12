@@ -68,6 +68,60 @@ public protocol ConversionBackend: Sendable {
     func convert(_ request: ConversionRequest) throws -> ConversionResult
 }
 
+public struct KanjiConversionRequest: Equatable, Sendable {
+    public var raw: String
+    public var kana: String
+    public var memory: String
+
+    public init(raw: String, kana: String, memory: String = "") {
+        self.raw = raw
+        self.kana = kana
+        self.memory = memory
+    }
+}
+
+public protocol KanjiConversionBackend: Sendable {
+    func convertToKanji(_ request: KanjiConversionRequest) async throws -> String
+    func prewarm()
+}
+
+public extension KanjiConversionBackend {
+    func prewarm() {}
+}
+
+public enum KanjiPromptBuilder {
+    public static func prompt(for request: KanjiConversionRequest) -> String {
+        var sections: [String] = []
+        sections.append("""
+        You convert a Japanese draft typed in romaji into natural written Japanese.
+        Use kanji where a fluent writer would. Output ONLY the converted Japanese text — no explanations, no quotes.
+
+        Rules:
+        - Do not answer, summarize, or extend the draft. Convert it only.
+        - Preserve embedded English words, numbers, spaces, and line breaks exactly as written.
+        """)
+        let memory = request.memory.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !memory.isEmpty {
+            sections.append("""
+            Prefer the terminology below when a source term appears.
+
+            Terminology:
+            \(memory)
+            """)
+        }
+        sections.append("""
+        Romaji draft:
+        \(request.raw)
+
+        Kana reading:
+        \(request.kana)
+
+        Converted Japanese:
+        """)
+        return sections.joined(separator: "\n\n")
+    }
+}
+
 public struct IdleConversionPolicy: Equatable, Sendable {
     public var baseDelay: TimeInterval
     public var fastTypingDelay: TimeInterval
@@ -231,6 +285,8 @@ public struct Timing: Codable, Equatable, Sendable {
     public var maxComposingDelay: TimeInterval
     public var localIntelligenceEnabled: Bool
     public var localIntelligenceTimeout: TimeInterval
+    public var kanjiConversionEnabled: Bool
+    public var kanjiConversionTimeout: TimeInterval
     public var jumpModeTimeout: TimeInterval
 
     public init(
@@ -241,6 +297,8 @@ public struct Timing: Codable, Equatable, Sendable {
         maxComposingDelay: TimeInterval = 8.0,
         localIntelligenceEnabled: Bool = true,
         localIntelligenceTimeout: TimeInterval = 0.3,
+        kanjiConversionEnabled: Bool = true,
+        kanjiConversionTimeout: TimeInterval = 2.0,
         jumpModeTimeout: TimeInterval = 3.0
     ) {
         self.idleBaseDelay = idleBaseDelay
@@ -250,6 +308,8 @@ public struct Timing: Codable, Equatable, Sendable {
         self.maxComposingDelay = maxComposingDelay
         self.localIntelligenceEnabled = localIntelligenceEnabled
         self.localIntelligenceTimeout = localIntelligenceTimeout
+        self.kanjiConversionEnabled = kanjiConversionEnabled
+        self.kanjiConversionTimeout = kanjiConversionTimeout
         self.jumpModeTimeout = jumpModeTimeout
     }
 
@@ -261,6 +321,8 @@ public struct Timing: Codable, Equatable, Sendable {
         case maxComposingDelay
         case localIntelligenceEnabled
         case localIntelligenceTimeout
+        case kanjiConversionEnabled
+        case kanjiConversionTimeout
         case jumpModeTimeout
     }
 
@@ -273,6 +335,8 @@ public struct Timing: Codable, Equatable, Sendable {
         self.maxComposingDelay = try values.decodeIfPresent(TimeInterval.self, forKey: .maxComposingDelay) ?? 8.0
         self.localIntelligenceEnabled = try values.decodeIfPresent(Bool.self, forKey: .localIntelligenceEnabled) ?? true
         self.localIntelligenceTimeout = try values.decodeIfPresent(TimeInterval.self, forKey: .localIntelligenceTimeout) ?? 0.3
+        self.kanjiConversionEnabled = try values.decodeIfPresent(Bool.self, forKey: .kanjiConversionEnabled) ?? true
+        self.kanjiConversionTimeout = try values.decodeIfPresent(TimeInterval.self, forKey: .kanjiConversionTimeout) ?? 2.0
         self.jumpModeTimeout = try values.decodeIfPresent(TimeInterval.self, forKey: .jumpModeTimeout) ?? 3.0
     }
 }
@@ -475,6 +539,25 @@ public enum CandidateGenerator {
             values.append(.init(id: "raw", text: raw, label: "Raw", confidence: 0.1))
         }
         return values
+    }
+
+    public static func mergingKanji(_ kanji: String?, into candidates: [ConversionCandidate], memory: String = "") -> [ConversionCandidate] {
+        guard let kanji else {
+            return candidates
+        }
+        let trimmed = kanji.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return candidates
+        }
+        let kanaText = candidates.first(where: { $0.id == "kana" })?.text ?? ""
+        if !kanaText.isEmpty, trimmed.count > kanaText.count * 3 {
+            return candidates
+        }
+        let rewritten = MemoryTermRewriter.apply(memory: memory, to: trimmed)
+        if rewritten == kanaText {
+            return candidates
+        }
+        return [.init(id: "kanji", text: rewritten, label: "Kanji", confidence: 0.9)] + candidates
     }
 }
 

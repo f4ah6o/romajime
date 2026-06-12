@@ -18,6 +18,14 @@ Phase 1 is implemented:
   alphabetic labels or numeric aliases in reading order; type the label, then
   press Space to jump.
 - Use a rule-based romaji-to-kana core with simple `memory.md` term replacement.
+- Convert kana drafts to kanji with the on-device Foundation Models when
+  available; fall back to the kana result on timeout, error, or older macOS.
+  The model is prewarmed when composition starts so long-form drafts usually
+  convert without waiting for the model load.
+- Focus loss or input-source switch commits the kana result synchronously
+  because the OS expects the composition resolved before returning.
+- The marked text now carries proper TSM hilite attributes so the caret stays
+  at the end of the composition buffer across clients.
 
 The default idle conversion delay is 1.2 seconds. Very fast typing extends that
 wait to 1.8 seconds so long-form drafting is less likely to be interrupted.
@@ -65,6 +73,8 @@ keys are not configurable; only non-input control keys and timings are.
     "maxComposingDelay": 8.0,
     "localIntelligenceEnabled": true,
     "localIntelligenceTimeout": 0.3,
+    "kanjiConversionEnabled": true,
+    "kanjiConversionTimeout": 2.0,
     "jumpModeTimeout": 3.0
   }
 }

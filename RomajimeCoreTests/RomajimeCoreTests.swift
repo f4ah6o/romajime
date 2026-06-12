@@ -112,6 +112,81 @@ final class RomajimeCoreTests: XCTestCase {
         XCTAssertTrue(decoded.timing.localIntelligenceEnabled)
     }
 
+    func testKanjiPromptIncludesRawKanaAndMemory() {
+        let prompt = KanjiPromptBuilder.prompt(for: .init(raw: "kyou ha\nkaigi", kana: "きょう は\nかいぎ", memory: "mtg -> ミーティング"))
+        XCTAssertTrue(prompt.contains("kyou ha\nkaigi"))
+        XCTAssertTrue(prompt.contains("きょう は\nかいぎ"))
+        XCTAssertTrue(prompt.contains("mtg -> ミーティング"))
+        XCTAssertTrue(prompt.contains("Terminology:"))
+    }
+
+    func testKanjiPromptOmitsEmptyMemorySection() {
+        let prompt = KanjiPromptBuilder.prompt(for: .init(raw: "kyou", kana: "きょう", memory: "  \n"))
+        XCTAssertFalse(prompt.contains("Terminology:"))
+    }
+
+    func testMergingKanjiPrependsHighestConfidenceCandidate() {
+        let base = CandidateGenerator.candidates(raw: "kyou", kana: "きょう")
+        let merged = CandidateGenerator.mergingKanji("今日", into: base)
+        XCTAssertEqual(merged.first?.id, "kanji")
+        XCTAssertEqual(merged.first?.text, "今日")
+        XCTAssertEqual(merged.first?.confidence, 0.9)
+        XCTAssertEqual(merged.count, base.count + 1)
+    }
+
+    func testMergingKanjiAppliesMemoryRewriteToModelOutput() {
+        let base = CandidateGenerator.candidates(raw: "kyou mtg", kana: "きょう mtg")
+        let merged = CandidateGenerator.mergingKanji("今日 mtg", into: base, memory: "mtg -> ミーティング")
+        XCTAssertEqual(merged.first?.text, "今日 ミーティング")
+    }
+
+    func testMergingNilOrEmptyKanjiKeepsRuleBasedCandidates() {
+        let base = CandidateGenerator.candidates(raw: "kyou", kana: "きょう")
+        XCTAssertEqual(CandidateGenerator.mergingKanji(nil, into: base), base)
+        XCTAssertEqual(CandidateGenerator.mergingKanji("  \n", into: base), base)
+    }
+
+    func testMergingKanjiDedupesWhenEqualToKana() {
+        let base = CandidateGenerator.candidates(raw: "kyou", kana: "きょう")
+        XCTAssertEqual(CandidateGenerator.mergingKanji("きょう", into: base), base)
+    }
+
+    func testMergingKanjiRejectsRunawayOutput() {
+        let base = CandidateGenerator.candidates(raw: "kyou", kana: "きょう")
+        let runaway = String(repeating: "今日は会議です。", count: 5)
+        XCTAssertEqual(CandidateGenerator.mergingKanji(runaway, into: base), base)
+    }
+
+    func testFakeKanjiBackendFlow() async throws {
+        struct FakeKanjiBackend: KanjiConversionBackend {
+            var result: Result<String, Error>
+            func convertToKanji(_ request: KanjiConversionRequest) async throws -> String {
+                try result.get()
+            }
+        }
+
+        let base = CandidateGenerator.candidates(raw: "kyouhakaigi", kana: "きょうはかいぎ")
+        let request = KanjiConversionRequest(raw: "kyouhakaigi", kana: "きょうはかいぎ")
+
+        let success = FakeKanjiBackend(result: .success("今日は会議"))
+        let kanji = try await success.convertToKanji(request)
+        XCTAssertEqual(CandidateGenerator.mergingKanji(kanji, into: base).first?.text, "今日は会議")
+
+        struct FakeError: Error {}
+        let failure = FakeKanjiBackend(result: .failure(FakeError()))
+        let fallback = try? await failure.convertToKanji(request)
+        XCTAssertEqual(CandidateGenerator.mergingKanji(fallback, into: base).first?.text, "きょうはかいぎ")
+    }
+
+    func testTimingDecodesMissingKanjiConversionKeys() throws {
+        let data = """
+        { "idleBaseDelay": 1.2 }
+        """.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(Timing.self, from: data)
+        XCTAssertTrue(decoded.kanjiConversionEnabled)
+        XCTAssertEqual(decoded.kanjiConversionTimeout, 2.0)
+    }
+
     func testTextUnitScannerUsesPhraseBoundariesNotWhitespace() {
         let targets = TextUnitScanner.jumpTargets(in: "koreha yameru. motto chobun\n  もっと 長文。", baseLocation: 10)
         XCTAssertEqual(targets.map(\.label), ["a", "b", "c"])

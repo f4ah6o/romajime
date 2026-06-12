@@ -30,6 +30,9 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
     private var compositionStartedAt: Date?
     private var readinessRequestID = 0
     private var readinessClient: Any?
+    private var commitRequestID = 0
+    private var pendingCommitClient: Any?
+    var kanjiBackend: any KanjiConversionBackend = FoundationModelsKanjiBackend()
     private var jumpTargets: [JumpTarget] = []
     private var jumpLabelBuffer = ""
     private var jumpModeTimer: Timer?
@@ -62,7 +65,9 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
     }
 
     public override func commitComposition(_ sender: Any!) {
-        convertAndCommit(client: sender)
+        // The OS expects the composition resolved synchronously here (focus
+        // loss, input-source switch), so skip the async kanji pass.
+        convertAndCommit(client: sender, allowAsync: false)
     }
 
     public override func candidates(_ sender: Any!) -> [Any]! {
@@ -124,11 +129,45 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
         return false
     }
 
-    private func convertAndCommit(client sender: Any!) {
+    private func convertAndCommit(client sender: Any!, allowAsync: Bool = true) {
         cancelIdleConversion()
-        let request = ConversionRequest(raw: state.buffer, memory: memoryStore.loadMemory(), kanaCandidate: nil)
-        let result = (try? backend.convert(request)) ?? ConversionResult(converted: state.buffer, refined: state.buffer, confidence: 0, candidates: [])
-        commit(result.candidates.first?.text ?? state.buffer, client: sender)
+        let buffer = state.buffer
+        guard !buffer.isEmpty else {
+            return
+        }
+        let memory = memoryStore.loadMemory()
+        let request = ConversionRequest(raw: buffer, memory: memory, kanaCandidate: nil)
+        let result = (try? backend.convert(request)) ?? ConversionResult(converted: buffer, refined: buffer, confidence: 0, candidates: [])
+        let kanaText = result.candidates.first?.text ?? buffer
+
+        commitRequestID += 1
+        let requestID = commitRequestID
+
+        guard allowAsync, config.timing.kanjiConversionEnabled else {
+            commit(kanaText, client: sender)
+            return
+        }
+
+        let kanjiRequest = KanjiConversionRequest(raw: buffer, kana: kanaText, memory: memory)
+        let timeout = config.timing.kanjiConversionTimeout
+        pendingCommitClient = sender
+        let kanjiBackend = kanjiBackend
+        let baseCandidates = result.candidates
+        Task { [weak self] in
+            let kanji = await KanjiConversionRunner.run(backend: kanjiBackend, request: kanjiRequest, timeout: timeout)
+            await MainActor.run {
+                self?.finishKanjiCommit(requestID: requestID, buffer: buffer, baseCandidates: baseCandidates, kanaText: kanaText, kanji: kanji, memory: memory)
+            }
+        }
+    }
+
+    private func finishKanjiCommit(requestID: Int, buffer: String, baseCandidates: [ConversionCandidate], kanaText: String, kanji: String?, memory: String) {
+        guard commitRequestID == requestID, state.buffer == buffer, let client = pendingCommitClient else {
+            return
+        }
+        pendingCommitClient = nil
+        let merged = CandidateGenerator.mergingKanji(kanji, into: baseCandidates, memory: memory)
+        commit(merged.first?.text ?? kanaText, client: client)
     }
 
     private func scheduleIdleConversion(client sender: Any!) {
@@ -140,6 +179,9 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
         let now = Date()
         if compositionStartedAt == nil {
             compositionStartedAt = now
+            if config.timing.kanjiConversionEnabled {
+                kanjiBackend.prewarm()
+            }
         }
         let interval = lastInputAt.map { now.timeIntervalSince($0) }
         lastInputAt = now
@@ -307,7 +349,23 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
 
     private func updateMarkedText(client sender: Any!) {
         let text = state.buffer
-        inputClient(sender)?.setMarkedText(text, selectionRange: NSRange(location: text.utf16.count, length: 0), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+        guard let client = inputClient(sender) else {
+            return
+        }
+        let attributed = NSAttributedString(string: text, attributes: markedTextAttributes(length: text.utf16.count))
+        client.setMarkedText(
+            attributed,
+            selectionRange: NSRange(location: text.utf16.count, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: NSNotFound)
+        )
+    }
+
+    private func markedTextAttributes(length: Int) -> [NSAttributedString.Key: Any] {
+        let range = NSRange(location: 0, length: length)
+        if let attributes = mark(forStyle: kTSMHiliteSelectedRawText, at: range) as? [NSAttributedString.Key: Any] {
+            return attributes
+        }
+        return [.underlineStyle: NSUnderlineStyle.single.rawValue, .markedClauseSegment: 0]
     }
 
     private func clearMarkedText(client sender: Any!) {
@@ -328,6 +386,7 @@ public final class RomajimeInputController: IMKInputController, @unchecked Senda
         compositionStartedAt = nil
         readinessRequestID += 1
         readinessClient = nil
+        commitRequestID += 1
     }
 }
 
