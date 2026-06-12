@@ -16,6 +16,7 @@ targets:
     platform: macOS
     sources:
       - RomajimeApp
+      - Resources
     dependencies:
       - target: RomajimeCore
     info:
@@ -39,6 +40,7 @@ targets:
     platform: macOS
     sources:
       - RomajimeInputMethod
+      - Resources
     dependencies:
       - sdk: InputMethodKit.framework
       - sdk: FoundationModels.framework

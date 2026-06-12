@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		03737C29E73DED7C49FCC726 /* RomajimeInputMethod.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B15C79D6566D7F78751A907 /* RomajimeInputMethod.swift */; };
+		054FC2E0633C0F734415EBBE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DD7BD2389C84C07BA242D194 /* Assets.xcassets */; };
 		248B64AA6552B54D6D21914C /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B30BE58B7F286BC9A908AE42 /* FoundationModels.framework */; };
 		2733A5B8AF4A15E017D5C4C0 /* InputMethodKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 61D6783C85D69D747CF80C98 /* InputMethodKit.framework */; };
 		2A0B7C75A1BA66548D606ABB /* RomajimeCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F4510F15B4947A611C5353E /* RomajimeCore.swift */; };
@@ -21,6 +22,7 @@
 		B75992D03C08C0D784DB2C79 /* RomajimeCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FF422929657525E07DC88766 /* RomajimeCore.framework */; };
 		D6183E872F876D88F03A75B7 /* RomajimeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E266651CAECA71C6A2EC3C /* RomajimeApp.swift */; };
 		ECBB8C7EB6B8E19B537576B3 /* RomajimeCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = FF422929657525E07DC88766 /* RomajimeCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		F80AE81A59B8495CC1B41136 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DD7BD2389C84C07BA242D194 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -97,6 +99,7 @@
 		8C2C3A09D0703B90051F4622 /* RomajimeInputMethod.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RomajimeInputMethod.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B16026A92A4124EFE440F65F /* Romajime.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Romajime.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B30BE58B7F286BC9A908AE42 /* FoundationModels.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FoundationModels.framework; path = System/Library/Frameworks/FoundationModels.framework; sourceTree = SDKROOT; };
+		DD7BD2389C84C07BA242D194 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E5659431F442521A694C5CF1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FBDFAFA80ABAE735F3FBA427 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FF422929657525E07DC88766 /* RomajimeCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = RomajimeCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -161,6 +164,14 @@
 			path = RomajimeApp;
 			sourceTree = "<group>";
 		};
+		37A06A4C855154CA1335F062 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				DD7BD2389C84C07BA242D194 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		402405FEAB54B1D920E1471B /* RomajimeInputMethod */ = {
 			isa = PBXGroup;
 			children = (
@@ -175,6 +186,7 @@
 		6D81EA010B037CCB8E0CD1C8 = {
 			isa = PBXGroup;
 			children = (
+				37A06A4C855154CA1335F062 /* Resources */,
 				2A8237C0E54E8B5BEB133C0C /* RomajimeApp */,
 				909F0563EB36E649D966E8FC /* RomajimeCore */,
 				9E295AD3B32241C755824BEE /* RomajimeCoreTests */,
@@ -210,6 +222,7 @@
 			buildConfigurationList = 105C138AC88340697569054B /* Build configuration list for PBXNativeTarget "Romajime" */;
 			buildPhases = (
 				383B75AAE7784C0002EC7C90 /* Sources */,
+				2ADE34D813F9446052A931B9 /* Resources */,
 				38E1D9811CE039F5570E3EB8 /* Frameworks */,
 				104DACF1B31114A5065B109A /* Embed Frameworks */,
 			);
@@ -247,6 +260,7 @@
 			buildConfigurationList = 3725DA8D1B583F21A23ADD62 /* Build configuration list for PBXNativeTarget "RomajimeInputMethod" */;
 			buildPhases = (
 				09ADAB5136C95551B67EAD4C /* Sources */,
+				989EE1DFDBE58663CA275E2D /* Resources */,
 				CC84ECD9FFF1227A7AC01A68 /* Frameworks */,
 				7D090AEDA6450C596F4D90B4 /* Embed Frameworks */,
 			);
@@ -326,6 +340,25 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		2ADE34D813F9446052A931B9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F80AE81A59B8495CC1B41136 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		989EE1DFDBE58663CA275E2D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				054FC2E0633C0F734415EBBE /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		09ADAB5136C95551B67EAD4C /* Sources */ = {

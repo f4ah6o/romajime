@@ -1,58 +1,45 @@
+<p align="center">
+  <img src="docs/assets/romajime-logo.png" alt="romajime logo" width="160">
+</p>
+
 # romajime
 
-romajime is a macOS InputMethodKit proof of concept for typing Japanese from romaji.
+romajime は、ローマ字で日本語を入力するための macOS InputMethodKit 実験実装です。
 
-## Current Phase
+英語版の README は [README.en.md](README.en.md) にあります。
 
-Phase 1 is implemented:
+## 現在のフェーズ
 
-- Buffer romaji input in an InputMethodKit controller.
-- Keep spaces in the composition buffer for long-form romaji drafts.
-- Do not do IME-style conversion or candidate cycling while typing.
-- Convert and commit the whole buffered draft automatically after typing pauses.
-- Keep Return and keypad Enter as newlines in the composition buffer by default.
-- Enter can still be configured as ignored, so chat-style Send shortcuts do not
-  become an accidental raw commit path.
-- Convert and commit immediately with Escape while composing.
-- Start phrase jump mode with Escape while not composing. Jump labels accept
-  alphabetic labels or numeric aliases in reading order; type the label, then
-  press Space to jump.
-- Use a rule-based romaji-to-kana core with simple `memory.md` term replacement.
-- Convert kana drafts to kanji with the on-device Foundation Models when
-  available; fall back to the kana result on timeout, error, or older macOS.
-  The model is prewarmed when composition starts so long-form drafts usually
-  convert without waiting for the model load.
-- Focus loss or input-source switch commits the kana result synchronously
-  because the OS expects the composition resolved before returning.
-- The marked text now carries proper TSM hilite attributes so the caret stays
-  at the end of the composition buffer across clients.
+Phase 1 は実装済みです。
 
-The default idle conversion delay is 1.2 seconds. Very fast typing extends that
-wait to 1.8 seconds so long-form drafting is less likely to be interrupted.
-romajime does not require Control+Enter or Command+Enter because those keys are
-often used as Send shortcuts in chat apps.
+- InputMethodKit コントローラでローマ字入力をバッファします。
+- 長めのローマ字下書きに使えるよう、変換中バッファ内のスペースを保持します。
+- 入力中の IME 風変換や候補巡回は行いません。
+- 入力が止まったあと、バッファ全体を自動で変換して確定します。
+- Return とテンキー Enter は、デフォルトでは変換中バッファ内の改行として扱います。
+- Enter は無視する設定にもできるため、チャットアプリの送信ショートカットが意図しない生文字列の確定経路になりません。
+- 変換中に Escape を押すと、即座に変換して確定します。
+- 変換中でないときに Escape を押すと、フレーズジャンプモードを開始します。ジャンプラベルは読み順の英字ラベルまたは数字エイリアスに対応し、ラベルを入力してから Space でジャンプします。
+- ルールベースのローマ字かな変換コアと、単純な `memory.md` 用語置換を使います。
+- 利用可能な場合は、オンデバイスの Foundation Models でかな下書きを漢字に変換します。タイムアウト、エラー、古い macOS ではかな結果にフォールバックします。長文下書きでもモデル読み込み待ちが起きにくいよう、入力開始時にモデルを事前ウォームアップします。
+- フォーカス喪失または入力ソース切り替え時は、OS が戻り値の前に変換中テキストの解決を期待するため、同期的にかな結果を確定します。
+- marked text には適切な TSM hilite 属性を付けているため、クライアントをまたいでもキャレットは変換中バッファの末尾に留まります。
 
-Jump mode reads nearby text from the active `IMKTextInput`, groups it into
-larger phrases using punctuation and newlines rather than every whitespace
-separated word, then moves the insertion point to the chosen phrase when Space
-confirms the typed label. Alphabet labels run `a` through `z`, then `aa`, `ab`,
-and so on; numeric aliases run `1`, `2`, `3`, and so on. Jump mode cancels after
-3 seconds of inactivity. Inline visual link overlays are not implemented yet;
-that likely needs a companion accessibility overlay rather than pure
-InputMethodKit marked text.
+デフォルトのアイドル変換待ち時間は 1.2 秒です。非常に速く入力している場合は 1.8 秒まで延長されるため、長文下書きが途中で分断されにくくなります。romajime は Control+Enter や Command+Enter を必要としません。これらのキーはチャットアプリで送信ショートカットとしてよく使われるためです。
 
-The shared conversion core lives in `RomajimeCore` so later AI conversion and iOS keyboard work can reuse the same state and backend contracts.
+ジャンプモードでは、アクティブな `IMKTextInput` から周辺テキストを読み取り、空白区切りの単語ごとではなく、句読点や改行を使って大きめのフレーズにまとめます。その後、Space で入力済みラベルを確定すると、選んだフレーズへ挿入位置を移動します。英字ラベルは `a` から `z`、続いて `aa`、`ab` のように進みます。数字エイリアスは `1`、`2`、`3` のように進みます。ジャンプモードは 3 秒間操作がないとキャンセルされます。インラインの視覚的なリンクオーバーレイはまだ実装していません。これは純粋な InputMethodKit の marked text ではなく、補助的なアクセシビリティオーバーレイが必要になる可能性があります。
 
-## Configuration
+共有変換コアは `RomajimeCore` にあります。今後の AI 変換や iOS キーボードでも、同じ状態管理とバックエンド契約を再利用できるようにするためです。
 
-romajime reads optional configuration from:
+## 設定
+
+romajime は任意設定を次の場所から読み込みます。
 
 ```text
 ~/Library/Application Support/Romajime/config.json
 ```
 
-If the file is missing or invalid, romajime uses the defaults below. Text input
-keys are not configurable; only non-input control keys and timings are.
+ファイルがない場合や無効な場合、romajime は下記のデフォルトを使います。文字入力キーは設定できません。設定できるのは、非入力の制御キーとタイミングだけです。
 
 ```json
 {
@@ -80,102 +67,83 @@ keys are not configurable; only non-input control keys and timings are.
 }
 ```
 
-Default key codes are: Space `49`, Return `36`, keypad Enter `76`, Delete `51`,
-Escape `53`. Add `"requiredModifiers"` when a binding should only match an
-exact modifier mask.
+デフォルトのキーコードは、Space `49`、Return `36`、テンキー Enter `76`、Delete `51`、Escape `53` です。完全一致の修飾キーが必要なバインディングには `"requiredModifiers"` を追加してください。
 
-To restore the old Enter behavior, set `"newlineCommit": []` and
-`"ignoredCommit": [{ "keyCode": 36 }, { "keyCode": 76 }]`.
+以前の Enter 動作に戻すには、`"newlineCommit": []` と `"ignoredCommit": [{ "keyCode": 36 }, { "keyCode": 76 }]` を設定してください。
 
-## Build and Install (Recommended: Using Justfile)
+## ビルドとインストール（推奨: Justfile）
 
-### Prerequisites
+### 前提条件
 
-- macOS 26 SDK or later.
-- `xcodegen` (`brew install xcodegen`) and `just` (`brew install just`)
-- An **Apple Development** signing certificate. Free Apple ID is enough:
-  Xcode → Settings → Accounts → add Apple ID → Manage Certificates → '+' → Apple Development.
+- macOS 26 SDK 以降。
+- `xcodegen`（`brew install xcodegen`）と `just`（`brew install just`）。
+- **Apple Development** 署名証明書。無料の Apple ID で十分です。
+  Xcode -> Settings -> Accounts -> Apple ID を追加 -> Manage Certificates -> `+` -> Apple Development。
 
-### Quick Setup
+### クイックセットアップ
 
 ```bash
-# Build, sign, install to ~/Library/Input Methods, and register (no reboot needed)
+# ビルド、署名、~/Library/Input Methods へのインストール、登録を行います（再起動不要）
 just install
 
-# Then add romajime manually:
-#   System Settings → Keyboard → Input Sources → Edit → '+' → Japanese → romajime → Add
+# その後、romajime を手動で追加します。
+#   System Settings -> Keyboard -> Input Sources -> Edit -> '+' -> Japanese -> romajime -> Add
 
-# Verify registration / show test steps
+# 登録確認 / テスト手順の表示
 just check
 just test
 ```
 
-### Available Justfile Recipes
+### 利用できる Justfile レシピ
 
-Run `just help` for all available recipes:
+すべてのレシピは `just help` で確認できます。
 
-- **`just build`** - Compile the project with xcodebuild
-- **`just sign`** - Sign with your Apple Development certificate
-- **`just install`** - Build, sign, copy to ~/Library/Input Methods, and register
-- **`just register`** - (Re-)register the installed app with Text Input Services
-- **`just check`** - Verify the input source is visible to the system
-- **`just setup`** - Install + show System Settings configuration steps
-- **`just test`** - Display manual testing instructions
-- **`just dev-run`** - Launch the app directly (for development)
-- **`just clean`** - Remove build artifacts
-- **`just uninstall`** - Remove the input method from ~/Library/Input Methods
-- **`just test-unit`** - Run RomajimeCoreTests
-- **`just info`** - Show build configuration
+- **`just build`** - xcodebuild でプロジェクトをコンパイルします。
+- **`just sign`** - Apple Development 証明書で署名します。
+- **`just install`** - ビルド、署名、`~/Library/Input Methods` へのコピー、登録を行います。
+- **`just register`** - インストール済みアプリを Text Input Services に再登録します。
+- **`just check`** - 入力ソースがシステムから見えているか確認します。
+- **`just setup`** - インストールし、System Settings での設定手順を表示します。
+- **`just test`** - 手動テスト手順を表示します。
+- **`just dev-run`** - 開発用にアプリを直接起動します。
+- **`just clean`** - ビルド成果物を削除します。
+- **`just uninstall`** - `~/Library/Input Methods` から入力メソッドを削除します。
+- **`just test-unit`** - RomajimeCoreTests を実行します。
+- **`just info`** - ビルド設定を表示します。
 
-## Input Method Bundle
+## 入力メソッドバンドル
 
-The debug input method app is produced at:
+デバッグ用の入力メソッドアプリは次の場所に生成されます。
 
 ```text
 DerivedData/Build/Products/Debug/RomajimeInputMethod.app
 ```
 
-## macOS Registration Notes (Hard-Won Knowledge)
+## macOS 登録メモ（実地で得た知見）
 
-Getting a development-signed IME to appear in System Settings on macOS 26
-required all of the following — `just install` handles every step:
+開発署名した IME を macOS 26 の System Settings に表示するには、次の条件がすべて必要でした。`just install` はこれらの手順をすべて処理します。
 
-1. **Bundle ID must contain `.inputmethod.` as an inner component.**
-   `com.f12o.inputmethod.Romajime` works; `com.f12o.Romajime.inputmethod`
-   (trailing component) is silently ignored by the input source scan.
-   All real IMEs follow this shape: `com.justsystems.inputmethod.atok35`,
-   `dev.ensan.inputmethod.azooKeyMac`, `com.apple.inputmethod.Kotoeri`.
-2. **`ENABLE_DEBUG_DYLIB: NO`.** Xcode debug builds otherwise produce a stub
-   executable plus `*.debug.dylib`, which breaks the IME bundle.
-3. **A valid code signature.** Ad-hoc builds with `CODE_SIGNING_ALLOWED: NO`
-   leave a broken signature. Sign frameworks first, then the app
-   (`codesign --force --options runtime --sign "Apple Development: ..."`).
-4. **Copy with `ditto`, not `cp -r`** — `cp` flattens the framework symlink
-   structure and invalidates the signature.
-5. **Rebuild the per-user input source cache atomically.** The cache lives at
-   `$(getconf DARWIN_USER_CACHE_DIR)/com.apple.IntlDataCache.le*`. Stale caches
-   hide new IMEs. The deletion and the rescan must happen inside one process
-   (`script/imesetup.swift refresh`): if a sandboxed process rebuilds the cache
-   first, it cannot read `~/Library/Input Methods` and writes a cache without
-   user IMEs.
-6. **Never call `TISRegisterInputSource` / `TISEnableInputSource`** from a
-   helper on macOS 26 — both write back a store that drops user-installed
-   bundles for other processes. Let the directory scan discover the bundle and
-   let the user enable it in System Settings.
+1. **Bundle ID は途中のコンポーネントとして `.inputmethod.` を含む必要があります。**
+   `com.f12o.inputmethod.Romajime` は動作しますが、`com.f12o.Romajime.inputmethod` のように末尾コンポーネントにしたものは入力ソーススキャンで黙って無視されます。実在する IME もすべてこの形です: `com.justsystems.inputmethod.atok35`、`dev.ensan.inputmethod.azooKeyMac`、`com.apple.inputmethod.Kotoeri`。
+2. **`ENABLE_DEBUG_DYLIB: NO`。** Xcode のデバッグビルドは、通常スタブ実行ファイルと `*.debug.dylib` を生成します。これは IME バンドルを壊します。
+3. **有効なコード署名。** `CODE_SIGNING_ALLOWED: NO` の ad-hoc ビルドは壊れた署名を残します。先にフレームワークへ署名し、その後アプリへ署名します（`codesign --force --options runtime --sign "Apple Development: ..."`）。
+4. **コピーには `cp -r` ではなく `ditto` を使います。** `cp` はフレームワークのシンボリックリンク構造を平坦化し、署名を無効にします。
+5. **ユーザーごとの入力ソースキャッシュを原子的に再構築します。** キャッシュは `$(getconf DARWIN_USER_CACHE_DIR)/com.apple.IntlDataCache.le*` にあります。古いキャッシュは新しい IME を隠します。削除と再スキャンは 1 つのプロセス内（`script/imesetup.swift refresh`）で行う必要があります。サンドボックス化されたプロセスが先にキャッシュを再構築すると、`~/Library/Input Methods` を読めず、ユーザー IME を含まないキャッシュを書き込んでしまいます。
+6. **macOS 26 ではヘルパーから `TISRegisterInputSource` / `TISEnableInputSource` を呼ばないでください。** どちらも、他プロセスから見るとユーザーインストール済みバンドルを落とすストアを書き戻します。ディレクトリスキャンでバンドルを発見させ、ユーザーが System Settings で有効化する流れに任せます。
 
-## Memory
+## メモリ
 
-romajime reads optional term replacements from:
+romajime は任意の用語置換を次の場所から読み込みます。
 
 ```text
 ~/Library/Application Support/Romajime/memory.md
 ```
 
-Each mapping is one line:
+各マッピングは 1 行です。
 
 ```text
 mtg -> ミーティング
 todo -> TODO
 ```
 
-Secrets and model registry tokens should not be stored here. Use 1Password Developer Environments or runtime injection for future model-related credentials.
+秘密情報やモデルレジストリトークンをここに保存しないでください。将来モデル関連の認証情報が必要になった場合は、1Password Developer Environments またはランタイム注入を使います。
