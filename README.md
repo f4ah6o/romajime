@@ -178,6 +178,8 @@ just learn --corpus eval/corpus.tsv --dry-run   # 履歴から学習される語
 just learn --corpus eval/corpus.tsv             # english_terms.txt に反映
 ```
 
+`learn` は単語学習に加えて、フレーズ単位の言い換え候補（例: `ぷろぱち -> プロパティ`、`meta でえた -> メタデータ`）もマイニングします。フレーズ置換は誤ると被害が大きいため自動適用はせず、`memory_proposals.txt` に出現回数・例文つきで書き出します。内容を確認して、信頼できる行だけを `memory.md` にコピーしてください（memory.md はかな変換の後段と LLM プロンプトの両方に効きます）。単語は常に ASCII、フレーズは文脈つきで言い換え、最終判断は LLM、という 3 層の役割分担です。
+
 学習で増えるファイル:
 
 ```text

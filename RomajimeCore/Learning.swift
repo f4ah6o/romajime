@@ -152,7 +152,8 @@ public enum LearningMiner {
         "made", "demo", "node", "sore", "kana", "mono", "mama", "site", "date",
         "sake", "mine", "name", "kite", "hate", "none", "dame", "mata", "dare",
         "doko", "koko", "soko", "kore", "are", "ore", "kimi", "uchi", "mado",
-        "kado", "hako", "kami", "yome", "sato", "moto", "seki", "hone", "mura"
+        "kado", "hako", "kami", "yome", "sato", "moto", "seki", "hone", "mura",
+        "kansai", "kantou", "hoge", "fuga", "piyo", "nan", "memo", "naka", "ima"
     ]
 
     public static func minimumOccurrences(_ count: Int = 2) -> Int { count }
@@ -234,6 +235,153 @@ public enum LearningMiner {
         output += terms.joined(separator: "\n") + "\n"
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try? output.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    public struct PhraseRewrite: Equatable, Sendable {
+        public var from: String
+        public var to: String
+        public var count: Int
+        public var example: String
+
+        public init(from: String, to: String, count: Int, example: String) {
+            self.from = from
+            self.to = to
+            self.count = count
+            self.example = example
+        }
+    }
+
+    // Phrase-level learning: spans where the engine's kana output disagrees
+    // with the written text, proposed as memory.md rewrite lines
+    // ("meta でえた -> メタデータ"). Proposals only — memory.md is user-curated,
+    // and a wrong phrase rewrite fires anywhere in a draft, so these are
+    // written for review instead of applied automatically.
+    public static func minePhraseRewrites(
+        entries: [LearningLogEntry],
+        lexicon: UserLexicon,
+        existingMemory: String = "",
+        minimumCount: Int = 2
+    ) -> [PhraseRewrite] {
+        let dictionary = RomajiDictionary.withLexicon(lexicon)
+        let knownSources = Set(existingMemory.split(separator: "\n").compactMap { line -> String? in
+            let parts = line.split(separator: "->", maxSplits: 1)
+            return parts.count == 2 ? parts[0].trimmingCharacters(in: .whitespaces) : nil
+        })
+        var counts: [String: Int] = [:]
+        var targets: [String: String] = [:]
+        var examples: [String: String] = [:]
+
+        for entry in entries {
+            guard containsJapanese(entry.committed), !entry.committed.contains(entry.raw) else {
+                continue
+            }
+            for line in entry.committed.split(separator: "\n") {
+                let line = String(line)
+                let tokens = ReverseTransliterator.alignedTokens(in: line)
+                let got = tokens.map { token in
+                    token.romaji.map { dictionary.convert(CompositionNormalizer.normalizeWhitespace($0)) } ?? token.text
+                }
+                let expected = tokens.map { $0.kana ?? $0.text }
+                for span in mismatchSpans(tokens: tokens, got: got, expected: expected) {
+                    let from = got[span].joined(separator: " ")
+                    guard from.count >= 3, !knownSources.contains(from), !from.contains("~") else {
+                        continue
+                    }
+                    // A pure-ASCII source is an english_terms decision, not a
+                    // phrase rule — as a memory line it would rewrite every
+                    // occurrence, including ones meant to stay ASCII.
+                    guard containsJapanese(from) else {
+                        continue
+                    }
+                    let to = originalSubstring(of: line, tokens: tokens, span: span)
+                    guard containsJapanese(to), normalizeForComparison(from) != normalizeForComparison(to) else {
+                        continue
+                    }
+                    let key = "\(from)\u{1F}\(to)"
+                    counts[key, default: 0] += 1
+                    targets[key] = to
+                    if examples[key] == nil {
+                        examples[key] = line
+                    }
+                }
+            }
+        }
+        return counts
+            .filter { $0.value >= minimumCount }
+            .map { key, count in
+                let from = String(key.split(separator: "\u{1F}")[0])
+                return PhraseRewrite(from: from, to: targets[key] ?? "", count: count, example: examples[key] ?? "")
+            }
+            .sorted { ($0.count, $1.from) > ($1.count, $0.from) }
+    }
+
+    // Maximal runs of tokens where the engine disagrees, expanded into
+    // adjacent katakana neighbors so loanword compounds stay whole
+    // (メタ|データ → メタデータ) without swallowing the rest of the sentence.
+    private static func mismatchSpans(
+        tokens: [ReverseTransliterator.AlignedToken],
+        got: [String],
+        expected: [String]
+    ) -> [ClosedRange<Int>] {
+        let mismatched = (0..<tokens.count).map {
+            normalizeForComparison(got[$0]) != normalizeForComparison(expected[$0])
+        }
+        var spans: [ClosedRange<Int>] = []
+        var index = 0
+        while index < tokens.count {
+            guard mismatched[index] else {
+                index += 1
+                continue
+            }
+            var end = index
+            while end + 1 < tokens.count, mismatched[end + 1] {
+                end += 1
+            }
+            var start = index
+            while start > 0, isKatakanaCompoundNeighbor(tokens, start - 1, start) {
+                start -= 1
+            }
+            while end + 1 < tokens.count, isKatakanaCompoundNeighbor(tokens, end, end + 1) {
+                end += 1
+            }
+            spans.append(start...end)
+            index = end + 1
+        }
+        return spans
+    }
+
+    private static func isKatakanaCompoundNeighbor(
+        _ tokens: [ReverseTransliterator.AlignedToken], _ left: Int, _ right: Int
+    ) -> Bool {
+        tokens[left].utf16Offset + tokens[left].utf16Length == tokens[right].utf16Offset
+            && isKatakana(tokens[left].text) && isKatakana(tokens[right].text)
+    }
+
+    private static func isKatakana(_ text: String) -> Bool {
+        !text.isEmpty && text.unicodeScalars.allSatisfy {
+            (0x30A0...0x30FF).contains($0.value) || $0.value == 0x30FC
+        }
+    }
+
+    private static func originalSubstring(
+        of line: String, tokens: [ReverseTransliterator.AlignedToken], span: ClosedRange<Int>
+    ) -> String {
+        let start = tokens[span.lowerBound].utf16Offset
+        let end = tokens[span.upperBound].utf16Offset + tokens[span.upperBound].utf16Length
+        let utf16 = Array(line.utf16)
+        guard start >= 0, end <= utf16.count, start < end else {
+            return ""
+        }
+        return String(decoding: utf16[start..<end], as: UTF16.self)
+    }
+
+    private static func normalizeForComparison(_ text: String) -> String {
+        String(text.lowercased().unicodeScalars.map { scalar -> Character in
+            if (0x30A1...0x30F6).contains(scalar.value) {
+                return Character(UnicodeScalar(scalar.value - 0x60)!)
+            }
+            return Character(scalar)
+        }).filter { !$0.isWhitespace && $0 != "ー" }
     }
 
     private static func containsJapanese(_ text: String) -> Bool {

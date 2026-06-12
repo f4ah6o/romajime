@@ -21,9 +21,11 @@ options:
   -h, --help        Show this help
 
 learn: mine recurring English terms the engine mangles and append them to
-english_terms.txt. Sources: the opt-in commit log (log.jsonl), or with
---corpus an eval corpus.tsv of romaji<TAB>kana<TAB>original lines (i.e.
-romaji-ized prompt history). --dry-run only reports; --dir overrides
+english_terms.txt; also propose phrase rewrites (memory.md candidates,
+written to memory_proposals.txt for review — never applied automatically).
+Sources: the opt-in commit log (log.jsonl), or with --corpus an eval
+corpus.tsv of romaji<TAB>kana<TAB>original lines (i.e. romaji-ized prompt
+history). --dry-run only reports; --dir overrides
 ~/Library/Application Support/Romajime.
 """
 
@@ -56,6 +58,7 @@ func runLearn(_ arguments: [String]) -> Never {
         }
         index += 1
     }
+    var entries: [LearningLogEntry] = []
     let report: LearningMiner.Report
     if let corpusPath {
         let url = URL(fileURLWithPath: (corpusPath as NSString).expandingTildeInPath)
@@ -63,7 +66,7 @@ func runLearn(_ arguments: [String]) -> Never {
             FileHandle.standardError.write(Data("error: cannot read corpus \(corpusPath)\n".utf8))
             exit(2)
         }
-        let entries: [LearningLogEntry] = text.split(separator: "\n").compactMap { line in
+        entries = text.split(separator: "\n").compactMap { line in
             let parts = line.split(separator: "\t")
             guard parts.count == 3 else {
                 return nil
@@ -72,7 +75,8 @@ func runLearn(_ arguments: [String]) -> Never {
         }
         report = LearningMiner.runLearningPass(entries: entries, directory: directory, dryRun: dryRun)
     } else {
-        report = LearningMiner.runLearningPass(directory: directory, dryRun: dryRun)
+        entries = ConversionLogger.readEntries(from: directory)
+        report = LearningMiner.runLearningPass(entries: entries, directory: directory, dryRun: dryRun)
     }
     print("entries scanned: \(report.entriesScanned)")
     if report.addedEnglishTerms.isEmpty {
@@ -84,6 +88,31 @@ func runLearn(_ arguments: [String]) -> Never {
     let nearMisses = report.candidateCounts.filter { $0.value < LearningMiner.minimumOccurrences() }
     if !nearMisses.isEmpty {
         print("seen once (not yet learned): \(nearMisses.keys.sorted().joined(separator: ", "))")
+    }
+
+    // Phrase proposals are mined against the post-learning lexicon so words
+    // just added to english_terms.txt are reflected.
+    let lexicon = UserLexicon.load(from: directory)
+    let memoryURL = directory.appendingPathComponent("memory.md")
+    let memory = (try? String(contentsOf: memoryURL, encoding: .utf8)) ?? ""
+    let phrases = LearningMiner.minePhraseRewrites(entries: entries, lexicon: lexicon, existingMemory: memory)
+    if phrases.isEmpty {
+        print("no phrase rewrite proposals")
+    } else {
+        print("\nphrase rewrite proposals (review, then copy lines you trust into memory.md):")
+        for phrase in phrases.prefix(30) {
+            print("  \(phrase.from) -> \(phrase.to)    # \(phrase.count)x  e.g. \(phrase.example.prefix(40))")
+        }
+        if !dryRun {
+            let proposalsURL = directory.appendingPathComponent("memory_proposals.txt")
+            var output = "# memory.md candidates mined from your own text. Reviewed lines can be\n"
+            output += "# copied verbatim (the part before '#') into memory.md. Regenerated each run.\n"
+            for phrase in phrases {
+                output += "\(phrase.from) -> \(phrase.to)    # \(phrase.count)x  e.g. \(phrase.example.prefix(60))\n"
+            }
+            try? output.write(to: proposalsURL, atomically: true, encoding: .utf8)
+            print("written: \(proposalsURL.path) (\(phrases.count) proposals)")
+        }
     }
     exit(0)
 }

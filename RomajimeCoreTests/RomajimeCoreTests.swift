@@ -180,6 +180,43 @@ final class RomajimeCoreTests: XCTestCase {
         XCTAssertEqual(second.addedEnglishTerms, [])
     }
 
+    func testAlignedTokensExposeReadingsAndPositions() {
+        let tokens = ReverseTransliterator.alignedTokens(in: "今日は会議")
+        XCTAssertEqual(tokens.map(\.text), ["今日", "は", "会議"])
+        XCTAssertEqual(tokens.map(\.romaji), ["kyou", "ha", "kaigi"])
+        XCTAssertEqual(tokens.map(\.kana), ["きょう", "は", "かいぎ"])
+        XCTAssertEqual(tokens.map(\.utf16Offset), [0, 2, 3])
+    }
+
+    func testMinePhraseRewritesProposesKatakanaCompounds() {
+        // With "meta" protected as an English term, メタデータ renders as
+        // "meta でえた"; mining should propose the full compound rewrite.
+        let lexicon = UserLexicon(englishTerms: ["meta"])
+        let entries = [
+            LearningLogEntry(raw: "meta deeta mo fuyou", committed: "メタデータも不要"),
+            LearningLogEntry(raw: "meta deeta wo kesu", committed: "メタデータを消す")
+        ]
+        let phrases = LearningMiner.minePhraseRewrites(entries: entries, lexicon: lexicon)
+        XCTAssertEqual(phrases.first?.from, "meta でえた")
+        XCTAssertEqual(phrases.first?.to, "メタデータ")
+        XCTAssertEqual(phrases.first?.count, 2)
+    }
+
+    func testMinePhraseRewritesSkipsKnownMemoryAndSingles() {
+        let lexicon = UserLexicon(englishTerms: ["meta"])
+        let entries = [
+            LearningLogEntry(raw: "meta deeta mo fuyou", committed: "メタデータも不要"),
+            LearningLogEntry(raw: "meta deeta wo kesu", committed: "メタデータを消す"),
+            LearningLogEntry(raw: "kore dake", committed: "これだけ")
+        ]
+        let phrases = LearningMiner.minePhraseRewrites(
+            entries: entries,
+            lexicon: lexicon,
+            existingMemory: "meta でえた -> メタデータ\n"
+        )
+        XCTAssertTrue(phrases.isEmpty)
+    }
+
     func testLearningAutoRunnerHonorsInterval() throws {
         let dir = try makeTempDirectory()
         XCTAssertNotNil(LearningAutoRunner.runIfDue(directory: dir, interval: 3600))
